@@ -40,13 +40,22 @@ for Xcode / later phases to avoid risking the iOS build):
   is accepted; platforms remain `.v26` as specified.
 
 ## Phase 2 — Data model (SwiftData + CloudKit)
-- [ ] `LiftKind` enum + bar-tracking profile (wristTracked / backLoaded)
-- [ ] `Exercise`, `Program`, `ProgramDay`, `PlannedSet`
-- [ ] `WorkoutSession`, `CompletedSet`, `RepMetric`
-- [ ] `UserMaxes`, `CalibrationProfile`, `SpotterPairing`
-- [ ] Shared `ModelContainer` with `cloudKitDatabase: .private`
-- [ ] Seed presets: 5/3/1 and linear progression
-- [ ] Verify: model unit tests (insert/fetch/relationships) green
+- [x] `LiftKind` enum + bar-tracking profile (wristTracked / backLoaded) (2026-06-30)
+- [x] `Exercise`, `Program`, `ProgramDay`, `PlannedSet` (2026-06-30)
+- [x] `WorkoutSession`, `CompletedSet`, `RepMetric` (2026-06-30)
+- [x] `UserMaxes`, `CalibrationProfile`, `SpotterPairing` (2026-06-30)
+- [x] Shared `ModelContainer` with `cloudKitDatabase: .private` (2026-06-30)
+      <!-- `makeModelContainer(inMemory:cloudKit:)` uses CloudKit `.automatic`
+           (mirrors to the private DB from the entitlement) for production and
+           `.none` for in-memory/local; tests pass inMemory:true. -->
+- [x] Seed presets: 5/3/1 and linear progression (2026-06-30)
+- [x] Verify: model unit tests (insert/fetch/relationships) green (2026-06-30)
+      <!-- `swift test` green: 11 tests pass (8 ModelTests + 3 LiftKindTests).
+           iOS `Spottersaurus` scheme: BUILD SUCCEEDED on iPhone 17 sim.
+           Ordered relationships use an explicit `sortIndex`/`repIndex` + sorted
+           accessors (orderedDays/orderedSets/orderedRepMetrics) — robust and
+           CloudKit-safe, since SwiftData relationship arrays are unordered. -->
+
 
 ## Phase 3 — Detection engine (core risk, hardware-free)
 - [ ] `SampleBuffer` types (accel/device-motion/HR sample structs)
