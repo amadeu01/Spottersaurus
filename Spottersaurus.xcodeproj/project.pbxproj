@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4D42F7DDC9F610110B9F64EF /* SpottersaurusKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3C68AE2D3916E16DB1ABDBF8 /* SpottersaurusKit */; };
+		6555BC6349A074C243131609 /* SpottersaurusKit in Frameworks */ = {isa = PBXBuildFile; productRef = E80C4A7F1F38EE7D87177D25 /* SpottersaurusKit */; };
+		AA078ADDA09B506F968DB96E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C4B4393CD119A1E5B9616BE /* Foundation.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		89BC9BC12FF31AC70057D47D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +30,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		1C4B4393CD119A1E5B9616BE /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS11.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		8213A293FFC5FE4DB7C374E3 /* Spottersaurus Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Spottersaurus Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		89BC9BB12FF31AC50057D47D /* Spottersaurus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Spottersaurus.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		89BC9BC02FF31AC70057D47D /* SpottersaurusTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SpottersaurusTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		89BC9BCA2FF31AC70057D47D /* SpottersaurusUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SpottersaurusUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -32,17 +40,30 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		89BC9BB32FF31AC50057D47D /* Spottersaurus */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Spottersaurus;
 			sourceTree = "<group>";
 		};
 		89BC9BC32FF31AC70057D47D /* SpottersaurusTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = SpottersaurusTests;
 			sourceTree = "<group>";
 		};
 		89BC9BCD2FF31AC70057D47D /* SpottersaurusUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = SpottersaurusUITests;
+			sourceTree = "<group>";
+		};
+		CB061F32A3F9A51A7B602829 /* Spottersaurus Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = "Spottersaurus Watch App";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -52,6 +73,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6555BC6349A074C243131609 /* SpottersaurusKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -69,6 +91,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B624479BE75CF98AA50F2716 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA078ADDA09B506F968DB96E /* Foundation.framework in Frameworks */,
+				4D42F7DDC9F610110B9F64EF /* SpottersaurusKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -79,6 +110,8 @@
 				89BC9BC32FF31AC70057D47D /* SpottersaurusTests */,
 				89BC9BCD2FF31AC70057D47D /* SpottersaurusUITests */,
 				89BC9BB22FF31AC50057D47D /* Products */,
+				E7452E2ADAEBE39A657777F7 /* Frameworks */,
+				CB061F32A3F9A51A7B602829 /* Spottersaurus Watch App */,
 			);
 			sourceTree = "<group>";
 		};
@@ -88,8 +121,25 @@
 				89BC9BB12FF31AC50057D47D /* Spottersaurus.app */,
 				89BC9BC02FF31AC70057D47D /* SpottersaurusTests.xctest */,
 				89BC9BCA2FF31AC70057D47D /* SpottersaurusUITests.xctest */,
+				8213A293FFC5FE4DB7C374E3 /* Spottersaurus Watch App.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B4887543230E75E0A741F0B8 /* watchOS */ = {
+			isa = PBXGroup;
+			children = (
+				1C4B4393CD119A1E5B9616BE /* Foundation.framework */,
+			);
+			name = watchOS;
+			sourceTree = "<group>";
+		};
+		E7452E2ADAEBE39A657777F7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B4887543230E75E0A741F0B8 /* watchOS */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +162,7 @@
 			);
 			name = Spottersaurus;
 			packageProductDependencies = (
+				E80C4A7F1F38EE7D87177D25 /* SpottersaurusKit */,
 			);
 			productName = Spottersaurus;
 			productReference = 89BC9BB12FF31AC50057D47D /* Spottersaurus.app */;
@@ -134,8 +185,6 @@
 				89BC9BC32FF31AC70057D47D /* SpottersaurusTests */,
 			);
 			name = SpottersaurusTests;
-			packageProductDependencies = (
-			);
 			productName = SpottersaurusTests;
 			productReference = 89BC9BC02FF31AC70057D47D /* SpottersaurusTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -157,11 +206,32 @@
 				89BC9BCD2FF31AC70057D47D /* SpottersaurusUITests */,
 			);
 			name = SpottersaurusUITests;
-			packageProductDependencies = (
-			);
 			productName = SpottersaurusUITests;
 			productReference = 89BC9BCA2FF31AC70057D47D /* SpottersaurusUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		BF7CDF54A49A964C3EA68EE4 /* Spottersaurus Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2CB31BDAF71B9D08BD126FD4 /* Build configuration list for PBXNativeTarget "Spottersaurus Watch App" */;
+			buildPhases = (
+				E375DEA0FC25F8658C88C56B /* Sources */,
+				B624479BE75CF98AA50F2716 /* Frameworks */,
+				019B84E759FB2890010F5BBD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CB061F32A3F9A51A7B602829 /* Spottersaurus Watch App */,
+			);
+			name = "Spottersaurus Watch App";
+			packageProductDependencies = (
+				3C68AE2D3916E16DB1ABDBF8 /* SpottersaurusKit */,
+			);
+			productName = "Spottersaurus Watch App";
+			productReference = 8213A293FFC5FE4DB7C374E3 /* Spottersaurus Watch App.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -195,6 +265,9 @@
 			);
 			mainGroup = 89BC9BA82FF31AC50057D47D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 89BC9BB22FF31AC50057D47D /* Products */;
 			projectDirPath = "";
@@ -203,11 +276,19 @@
 				89BC9BB02FF31AC50057D47D /* Spottersaurus */,
 				89BC9BBF2FF31AC70057D47D /* SpottersaurusTests */,
 				89BC9BC92FF31AC70057D47D /* SpottersaurusUITests */,
+				BF7CDF54A49A964C3EA68EE4 /* Spottersaurus Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		019B84E759FB2890010F5BBD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		89BC9BAF2FF31AC50057D47D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -253,6 +334,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E375DEA0FC25F8658C88C56B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -269,6 +357,61 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		2333AD654DDE6EFEE6BCEA88 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YMWQA4CLV6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Spottersaurus;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = amadeu.dev.Spottersaurus;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = amadeu.dev.Spottersaurus.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		8870C7F50546565401710BBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YMWQA4CLV6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Spottersaurus;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = amadeu.dev.Spottersaurus;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = amadeu.dev.Spottersaurus.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 		89BC9BD22FF31AC70057D47D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -578,6 +721,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		2CB31BDAF71B9D08BD126FD4 /* Build configuration list for PBXNativeTarget "Spottersaurus Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8870C7F50546565401710BBB /* Release */,
+				2333AD654DDE6EFEE6BCEA88 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		89BC9BAC2FF31AC50057D47D /* Build configuration list for PBXProject "Spottersaurus" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -615,6 +767,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/SpottersaurusKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3C68AE2D3916E16DB1ABDBF8 /* SpottersaurusKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */;
+			productName = SpottersaurusKit;
+		};
+		E80C4A7F1F38EE7D87177D25 /* SpottersaurusKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */;
+			productName = SpottersaurusKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 89BC9BA92FF31AC50057D47D /* Project object */;
 }
