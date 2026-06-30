@@ -10,7 +10,20 @@ import SwiftUI
 import SpottersaurusKit
 
 struct ContentView: View {
+    @State private var showSplash = true
+
     var body: some View {
+        ZStack {
+            mainContent
+            if showSplash {
+                SplashView { showSplash = false }
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
+    }
+
+    private var mainContent: some View {
         NavigationStack {
             VStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "dumbbell.fill")

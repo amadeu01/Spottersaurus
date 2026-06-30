@@ -68,6 +68,17 @@ public enum Theme {
         public static let caution = RGBA(hex: 0xFF9800)
         /// "Alert" / RACK IT state — coral red.
         public static let alert = RGBA(hex: 0xFF3B30)
+
+        // MARK: Brand identity (from the dino mascot icons)
+
+        /// Brand navy — primary identity background.
+        public static let brandNavy = RGBA(hex: 0x1E3A6B)
+        /// Darker navy for gradients / dark appearance.
+        public static let brandNavyDark = RGBA(hex: 0x14284E)
+        /// Safety orange — brand accent.
+        public static let brandOrange = RGBA(hex: 0xF26A1B)
+        /// Dino green — mascot tint.
+        public static let dinoGreen = RGBA(hex: 0x5B9E3F)
     }
 }
 
@@ -88,6 +99,10 @@ public extension Theme {
         public static var optimal: Color { Palette.optimal.color }
         public static var caution: Color { Palette.caution.color }
         public static var alert: Color { Palette.alert.color }
+        public static var brandNavy: Color { Palette.brandNavy.color }
+        public static var brandNavyDark: Color { Palette.brandNavyDark.color }
+        public static var brandOrange: Color { Palette.brandOrange.color }
+        public static var dinoGreen: Color { Palette.dinoGreen.color }
     }
 }
 #endif
