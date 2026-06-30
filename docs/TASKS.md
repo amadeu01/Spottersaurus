@@ -58,14 +58,32 @@ for Xcode / later phases to avoid risking the iOS build):
 
 
 ## Phase 3 — Detection engine (core risk, hardware-free)
-- [ ] `SampleBuffer` types (accel/device-motion/HR sample structs)
-- [ ] `RepSegmenter` — eccentric/concentric phase split from gravity-removed accel
-- [ ] `VelocityIntegrator` — concentric velocity estimate (VBT) with drift handling
-- [ ] `Calibration` — per-lift baseline tempo + velocity band from warmups
-- [ ] `SpotEngine` — conservative two-stage (Stage 1 grind → Stage 2 RACK IT)
-- [ ] Squat path: tempo + HR + manual grind tap (velocity disabled)
-- [ ] Unit tests: clean reps (no fire), grind (Stage 1), hard pin (Stage 2), false-alarm guard
-- [ ] Verify: `swift test` green incl. recorded/synthetic IMU fixtures
+- [x] `SampleBuffer` types (accel/device-motion/HR sample structs) (2026-06-30)
+      <!-- `Detection/SampleBuffer.swift`: `Timestamped` protocol (MotionSample/
+           HRSample conform), generic `SampleBuffer` windowing helper,
+           gravity-removed `LinearSample`, and `GravityRemover` (EMA gravity
+           estimate + bar-axis projection). MotionSample/HRSample seeds reused. -->
+- [x] `RepSegmenter` — eccentric/concentric phase split from gravity-removed accel (2026-06-30)
+      <!-- ZUPT-integrated velocity; phases read off velocity sign; "still" =
+           sustained-quiet runs (>= minStillSeconds) so slow grinds aren't
+           chopped at their low-accel velocity peak. Emits `RepPhase` timings. -->
+- [x] `VelocityIntegrator` — concentric velocity estimate (VBT) with drift handling (2026-06-30)
+      <!-- Trapezoid integrate + endpoint-zero detrend (ZUPT at phase boundaries
+           / high-pass). Exposes mean + peak + displacement + full series. -->
+- [x] `Calibration` — per-lift baseline tempo + velocity band from warmups (2026-06-30)
+      <!-- Returns plain `CalibrationValues` (no SwiftData) the app maps onto
+           `CalibrationProfile`; velocity band disabled for back-loaded lifts. -->
+- [x] `SpotEngine` — conservative two-stage (Stage 1 grind → Stage 2 RACK IT) (2026-06-30)
+      <!-- Emits `.grinding`/`.rackIt`/`.resolved` SpotEvents w/ timestamps +
+           confidence + reason. Thresholds in `SpotConfig` (Phase-9 tunable). -->
+- [x] Squat path: tempo + HR + manual grind tap (velocity disabled) (2026-06-30)
+      <!-- backLoaded/!usesVelocityPath: tempo cadence + injected HR spike +
+           manual tap; VelocityIntegrator never invoked (usedVelocityPath=false). -->
+- [x] Unit tests: clean reps (no fire), grind (Stage 1), hard pin (Stage 2), false-alarm guard (2026-06-30)
+- [x] Verify: `swift test` green incl. recorded/synthetic IMU fixtures (2026-06-30)
+      <!-- `swift test`: 19 tests, 0 failures (8 new DetectionTests + 11
+           existing ModelTests/LiftKindTests stay green). Synthetic in-code
+           fixtures (sin² velocity bumps / grind plateau); no binary fixtures. -->
 
 ## Phase 4 — Watch session engine
 - [ ] `HKWorkoutSession` (functional strength training) lifecycle
