@@ -5,6 +5,7 @@ import SpottersaurusKit
 @Observable
 final class TodayViewModel {
     var sendStatus: PlannedSessionSendStatus = .ready
+    var commandStatus: WatchCommandSendStatus?
 
     func activeProgram(from programs: [Program]) -> Program? {
         programs.sorted { $0.createdAt > $1.createdAt }.first
@@ -20,5 +21,10 @@ final class TodayViewModel {
     @MainActor
     func sendPlannedSession(program: Program, day: ProgramDay, maxes: [UserMaxes], using dependencies: PlannerDependencies) async {
         sendStatus = await dependencies.sendPlannedSessionToWatch(program, day, maxes)
+    }
+
+    @MainActor
+    func sendWatchCommand(_ command: WatchCommandEnvelope.Kind, using dependencies: PlannerDependencies) async {
+        commandStatus = await dependencies.sendWatchCommand(command)
     }
 }

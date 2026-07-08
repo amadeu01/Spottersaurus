@@ -3,6 +3,7 @@ import SwiftUI
 import SpottersaurusKit
 
 struct AnalyticsView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query private var sessions: [WorkoutSession]
     @State private var selectedLift: LiftKind = .bench
 
@@ -42,6 +43,9 @@ struct AnalyticsView: View {
             }
             .background(Theme.Colors.canvas.opacity(0.04))
             .navigationTitle("Analytics")
+            .refreshable {
+                HistoryViewModel().refreshSavedSessionCount(in: modelContext)
+            }
         }
     }
 

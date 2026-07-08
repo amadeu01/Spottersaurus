@@ -3,12 +3,16 @@ import SpottersaurusKit
 
 struct WatchDependencies {
     var logger: LoggerGroup
+    var commandCenter: @MainActor () -> WatchCommandCenter
     var currentPlannedSet: @MainActor () -> PlannedSetEnvelope
     var sendLiveTick: @MainActor (LiveTickEnvelope) -> Void
     var sendFinishedSession: @MainActor (SessionEnvelope) -> Void
 
     static let live = WatchDependencies(
         logger: .watch,
+        commandCenter: {
+            WatchCommandCenter.shared
+        },
         currentPlannedSet: {
             LoggerGroup.watch.info(.watchLink, "loading current planned set")
             return WatchPlannedSessionStore.shared.currentPlannedSet()

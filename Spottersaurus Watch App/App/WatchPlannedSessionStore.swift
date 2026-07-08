@@ -7,6 +7,7 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
 
     private let payloadKey = "plannedSession"
     private let liveTickKey = "liveTick"
+    private let commandKey = "watchCommand"
     private let finishedSessionKey = "finishedSession"
     private let defaultsKey = "Spottersaurus.lastPlannedSession"
     private let lock = NSLock()
@@ -126,6 +127,31 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     func session(_ session: WCSession, didReceiveMessageData messageData: Data) {
         logger.info(.watchLink, "received planned session live message")
         store(messageData)
+    }
+
+    func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any],
+        replyHandler: @escaping ([String: Any]) -> Void
+    ) {
+        if let data = message[commandKey] as? Data {
+            receiveCommand(data)
+            replyHandler([commandKey: "ack"])
+            return
+        }
+
+        replyHandler([:])
+    }
+
+    private func receiveCommand(_ data: Data) {
+        guard let command = try? decoder.decode(WatchCommandEnvelope.self, from: data) else {
+            logger.error(.watchLink, "failed decoding watch command")
+            return
+        }
+
+        Task { @MainActor in
+            WatchCommandCenter.shared.receive(command, logger: logger)
+        }
     }
 
     private func store(_ data: Data) {

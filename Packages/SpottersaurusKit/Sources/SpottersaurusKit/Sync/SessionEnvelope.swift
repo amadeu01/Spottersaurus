@@ -123,6 +123,26 @@ public struct LiveTickEnvelope: Codable, Sendable, Equatable {
     }
 }
 
+/// A live control message from iPhone to Watch. Commands are intentionally
+/// small and explicit: the Watch owns the workout state machine and maps each
+/// command to the same action the wearer can tap locally.
+public struct WatchCommandEnvelope: Codable, Sendable, Equatable, Identifiable {
+    public enum Kind: String, Codable, Sendable, CaseIterable {
+        case startWarmup
+        case startWorkout
+    }
+
+    public var id: UUID
+    public var kind: Kind
+    public var issuedAt: Date
+
+    public init(id: UUID = UUID(), kind: Kind, issuedAt: Date = Date()) {
+        self.id = id
+        self.kind = kind
+        self.issuedAt = issuedAt
+    }
+}
+
 /// A single prescribed set sent from the iPhone planner to the Watch executor.
 /// This is the concrete, Watch-ready version of `PlannedSet`: percentage loads
 /// are resolved to kilograms before sending so the Watch does not need the

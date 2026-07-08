@@ -6,6 +6,7 @@ final class WatchLink: NSObject, WCSessionDelegate {
     static let shared = WatchLink()
 
     private let payloadKey = "plannedSession"
+    private let commandKey = "watchCommand"
     private let finishedSessionKey = "finishedSession"
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
@@ -28,6 +29,32 @@ final class WatchLink: NSObject, WCSessionDelegate {
         session?.delegate = self
         session?.activate()
         logger.info(.watchLink, "activated iPhone WCSession supported=\(session != nil)")
+    }
+
+    @MainActor
+    func send(command: WatchCommandEnvelope) async -> WatchCommandSendStatus {
+        guard let session, session.isReachable else {
+            logger.warning(.watchLink, "watch command unavailable reachable=\(session?.isReachable ?? false)")
+            return .watchUnavailable
+        }
+
+        let data: Data
+        do {
+            data = try encoder.encode(command)
+        } catch {
+            logger.error(.watchLink, "watch command encode failed: \(error.localizedDescription)")
+            return .failed
+        }
+
+        return await withCheckedContinuation { continuation in
+            session.sendMessage([commandKey: data]) { _ in
+                self.logger.notice(.watchLink, "watch command acknowledged kind=\(command.kind.rawValue)")
+                continuation.resume(returning: .sent)
+            } errorHandler: { error in
+                self.logger.warning(.watchLink, "watch command failed: \(error.localizedDescription)")
+                continuation.resume(returning: .failed)
+            }
+        }
     }
 
     @MainActor

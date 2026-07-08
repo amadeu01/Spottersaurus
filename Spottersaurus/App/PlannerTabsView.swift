@@ -27,9 +27,16 @@ struct PlannerTabsView: View {
         .onAppear {
             viewModel.ensureCompetitionMaxesExist(in: modelContext, existingMaxes: maxes)
             WatchLink.shared.configure(
+                onLiveTick: { tick in
+                    PhoneWatchSessionMonitor.shared.receiveLiveTick(tick)
+                },
                 onFinishedSession: { envelope in
                     LoggerGroup.iPhone.notice(.persistence, "importing finished session id=\(envelope.id) sets=\(envelope.sets.count)")
-                    _ = try? SessionImporter.importSession(envelope, into: modelContext)
+                    if let session = try? SessionImporter.importSession(envelope, into: modelContext) {
+                        try? modelContext.save()
+                        PhoneWatchSessionMonitor.shared.recordImport(envelope)
+                        LoggerGroup.iPhone.notice(.persistence, "imported workout session id=\(session.id)")
+                    }
                 }
             )
         }

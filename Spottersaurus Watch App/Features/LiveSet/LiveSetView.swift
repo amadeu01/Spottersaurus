@@ -11,6 +11,7 @@ struct LiveSetView: View {
     @State private var lastFeedbackAlertStage: AlertStage = .none
     @State private var crownMode: LiveSetCrownMode
     @State private var crownValue: Double
+    @State private var handledCommandID: UUID?
     @FocusState private var crownFocused: Bool
 
     init(plannedSet: PlannedSetEnvelope) {
@@ -72,12 +73,7 @@ struct LiveSetView: View {
                                 progress: viewModel.calibrationProgress,
                                 isCollecting: viewModel.isCalibrating,
                                 start: {
-                                    viewModel.startWarmupCalibration(logger: dependencies.logger)
-                                    sessionCoordinator.start(
-                                        viewModel: viewModel,
-                                        logger: dependencies.logger,
-                                        onLiveTick: dependencies.sendLiveTick
-                                    )
+                                    startWarmup()
                                 },
                                 finish: {
                                     viewModel.finishWarmupCalibration(logger: dependencies.logger)
@@ -88,13 +84,7 @@ struct LiveSetView: View {
                         LiveSetControlsView(
                             state: viewModel.state,
                             arm: {
-                                sessionCoordinator.stop(logger: dependencies.logger)
-                                viewModel.arm(logger: dependencies.logger)
-                                sessionCoordinator.start(
-                                    viewModel: viewModel,
-                                    logger: dependencies.logger,
-                                    onLiveTick: dependencies.sendLiveTick
-                                )
+                                startWorkout()
                             },
                             completeRep: viewModel.completeRep,
                             flagGrinding: viewModel.flagGrinding,
@@ -107,9 +97,7 @@ struct LiveSetView: View {
                             finishRest: {
                                 viewModel.finishRest(logger: dependencies.logger)
                                 sessionCoordinator.stop(logger: dependencies.logger)
-                                if let envelope = viewModel.finishedSessionEnvelope() {
-                                    dependencies.sendFinishedSession(envelope)
-                                }
+                                sendFinishedSessionIfAvailable()
                                 restStartedAt = nil
                             }
                         )
@@ -137,6 +125,9 @@ struct LiveSetView: View {
         .onChange(of: viewModel.alertStage) { _, newStage in
             playAlertFeedbackIfNeeded(newStage)
         }
+        .onChange(of: dependencies.commandCenter().latestCommand?.id) { _, _ in
+            handleLatestCommand()
+        }
         .onChange(of: crownEditingEnabled) { _, isEnabled in
             crownFocused = isEnabled
         }
@@ -148,12 +139,14 @@ struct LiveSetView: View {
             )
             if completed {
                 feedback.playRestCompleteCue()
+                sendFinishedSessionIfAvailable()
                 self.restStartedAt = nil
             }
         }
         .onAppear {
             feedback = WatchLiveSetFeedback(logger: dependencies.logger)
             crownFocused = crownEditingEnabled
+            handleLatestCommand()
         }
         .onDisappear {
             sessionCoordinator.stop(logger: dependencies.logger)
@@ -162,6 +155,45 @@ struct LiveSetView: View {
 
     private var crownEditingEnabled: Bool {
         viewModel.state == .idle || viewModel.state == .complete
+    }
+
+    private func startWarmup() {
+        guard viewModel.state == .idle || viewModel.state == .complete else { return }
+        viewModel.startWarmupCalibration(logger: dependencies.logger)
+        sessionCoordinator.start(
+            viewModel: viewModel,
+            logger: dependencies.logger,
+            onLiveTick: dependencies.sendLiveTick
+        )
+    }
+
+    private func startWorkout() {
+        sessionCoordinator.stop(logger: dependencies.logger)
+        viewModel.arm(logger: dependencies.logger)
+        sessionCoordinator.start(
+            viewModel: viewModel,
+            logger: dependencies.logger,
+            onLiveTick: dependencies.sendLiveTick
+        )
+    }
+
+    private func sendFinishedSessionIfAvailable() {
+        guard let envelope = viewModel.finishedSessionEnvelope() else { return }
+        dependencies.sendFinishedSession(envelope)
+    }
+
+    private func handleLatestCommand() {
+        guard let command = dependencies.commandCenter().latestCommand,
+              command.id != handledCommandID
+        else { return }
+
+        handledCommandID = command.id
+        switch command.kind {
+        case .startWarmup:
+            startWarmup()
+        case .startWorkout:
+            startWorkout()
+        }
     }
 
     private func playAlertFeedbackIfNeeded(_ stage: AlertStage) {

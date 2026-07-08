@@ -103,6 +103,19 @@ final class SyncEnvelopeTests: XCTestCase {
         XCTAssertEqual(decoded, tick)
     }
 
+    // MARK: WatchCommandEnvelope
+
+    func testWatchCommandEnvelopeRoundTrips() throws {
+        let command = WatchCommandEnvelope(
+            kind: .startWorkout,
+            issuedAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        let decoded = try roundTrip(command)
+        XCTAssertEqual(decoded, command)
+        XCTAssertEqual(decoded.kind, .startWorkout)
+    }
+
     // MARK: PlannedSessionEnvelope
 
     func testPlannedSessionEnvelopeRoundTrips() throws {
