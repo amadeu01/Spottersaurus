@@ -367,12 +367,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Spottersaurus Watch App/Spottersaurus Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = YMWQA4CLV6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = "Spottersaurus Watch App/Spottersaurus Watch App.entitlements";
 				INFOPLIST_KEY_CFBundleDisplayName = Spottersaurus;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Spottersaurus reads your heart rate during a set to spot for a grinding rep.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Spottersaurus saves your finished lifting sessions to Health.";
@@ -398,12 +398,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Spottersaurus Watch App/Spottersaurus Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = YMWQA4CLV6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				CODE_SIGN_ENTITLEMENTS = "Spottersaurus Watch App/Spottersaurus Watch App.entitlements";
 				INFOPLIST_KEY_CFBundleDisplayName = Spottersaurus;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Spottersaurus reads your heart rate during a set to spot for a grinding rep.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Spottersaurus saves your finished lifting sessions to Health.";
@@ -546,6 +546,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Spottersaurus/Spottersaurus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = YMWQA4CLV6;
@@ -553,7 +554,6 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				CODE_SIGN_ENTITLEMENTS = Spottersaurus/Spottersaurus.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Spottersaurus/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
@@ -582,6 +582,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Spottersaurus/Spottersaurus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = YMWQA4CLV6;
@@ -589,7 +590,6 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				CODE_SIGN_ENTITLEMENTS = Spottersaurus/Spottersaurus.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Spottersaurus/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;

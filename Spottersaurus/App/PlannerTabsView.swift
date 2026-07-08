@@ -16,6 +16,9 @@ struct PlannerTabsView: View {
             ProgramsView()
                 .tabItem { Label("Programs", systemImage: "list.bullet.rectangle") }
 
+            ReviewView()
+                .tabItem { Label("Review", systemImage: "chart.xyaxis.line") }
+
             MaxesView()
                 .tabItem { Label("Maxes", systemImage: "gauge.with.dots.needle.67percent") }
         }
@@ -23,6 +26,12 @@ struct PlannerTabsView: View {
         .environment(\.plannerDependencies, .live)
         .onAppear {
             viewModel.ensureCompetitionMaxesExist(in: modelContext, existingMaxes: maxes)
+            WatchLink.shared.configure(
+                onFinishedSession: { envelope in
+                    LoggerGroup.iPhone.notice(.persistence, "importing finished session id=\(envelope.id) sets=\(envelope.sets.count)")
+                    _ = try? SessionImporter.importSession(envelope, into: modelContext)
+                }
+            )
         }
     }
 }

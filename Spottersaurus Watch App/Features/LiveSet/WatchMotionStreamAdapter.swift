@@ -5,16 +5,23 @@ import SpottersaurusKit
 @MainActor
 final class WatchMotionStreamAdapter {
     private let sensorManager = CMBatchedSensorManager()
+    private let motionManager = CMMotionManager()
     private var motionTask: Task<Void, Never>?
     private var startedAt: TimeInterval?
+    private var fallbackStartedAt: Date?
 
     var isRunning: Bool {
-        motionTask != nil
+        motionTask != nil || motionManager.isAccelerometerActive
     }
 
-    func start(onMotion: @escaping @MainActor ([MotionSample]) -> Void) {
-        guard motionTask == nil else { return }
+    func start(
+        logger: any AppLogger = LoggerGroup.watch,
+        onMotion: @escaping @MainActor ([MotionSample]) -> Void
+    ) {
+        guard !isRunning else { return }
         startedAt = nil
+        fallbackStartedAt = nil
+        logger.info(.motion, "starting batched accelerometer stream")
 
         motionTask = Task { [sensorManager] in
             do {
@@ -23,20 +30,29 @@ final class WatchMotionStreamAdapter {
                     let samples = await MainActor.run {
                         self.makeSamples(from: batch)
                     }
+                    await MainActor.run {
+                        logger.debug(.motion, "batched accelerometer samples=\(samples.count)")
+                    }
                     await onMotion(samples)
                 }
             } catch {
                 await MainActor.run {
-                    self.stop()
+                    logger.warning(.motion, "batched accelerometer failed; starting fallback stream: \(error.localizedDescription)")
+                    self.startFallback(logger: logger, onMotion: onMotion)
                 }
             }
         }
     }
 
-    func stop() {
+    func stop(logger: any AppLogger = LoggerGroup.watch) {
+        if isRunning {
+            logger.info(.motion, "stopping accelerometer stream")
+        }
         motionTask?.cancel()
         motionTask = nil
+        motionManager.stopAccelerometerUpdates()
         startedAt = nil
+        fallbackStartedAt = nil
     }
 
     private func makeSamples(from batch: [CMAccelerometerData]) -> [MotionSample] {
@@ -51,6 +67,33 @@ final class WatchMotionStreamAdapter {
                 accelY: sample.acceleration.y,
                 accelZ: sample.acceleration.z
             )
+        }
+    }
+
+    private func startFallback(
+        logger: any AppLogger,
+        onMotion: @escaping @MainActor ([MotionSample]) -> Void
+    ) {
+        motionTask = nil
+        guard motionManager.isAccelerometerAvailable else {
+            logger.error(.motion, "fallback accelerometer is unavailable")
+            return
+        }
+
+        logger.info(.motion, "starting fallback accelerometer stream")
+        fallbackStartedAt = Date()
+        motionManager.accelerometerUpdateInterval = 1.0 / 50.0
+        motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+            guard let self, let data else { return }
+            let origin = self.fallbackStartedAt ?? Date()
+            onMotion([
+                MotionSample(
+                    timestamp: max(Date().timeIntervalSince(origin), 0),
+                    accelX: data.acceleration.x,
+                    accelY: data.acceleration.y,
+                    accelZ: data.acceleration.z
+                )
+            ])
         }
     }
 }

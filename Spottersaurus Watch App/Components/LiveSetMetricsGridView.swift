@@ -6,6 +6,7 @@ struct LiveSetMetricsGridView: View {
     var heartRate: Int
     var weightKg: Double
     var restText: String
+    var targetReps: String
 
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
@@ -15,6 +16,9 @@ struct LiveSetMetricsGridView: View {
             }
             HStack(spacing: Theme.Spacing.sm) {
                 LiveSetMetricTile(label: "LOAD", value: String(format: "%.1f", weightKg), unit: "kg")
+                LiveSetMetricTile(label: "REPS", value: targetReps, unit: nil)
+            }
+            HStack(spacing: Theme.Spacing.sm) {
                 LiveSetMetricTile(label: "REST", value: restText, unit: nil)
             }
         }

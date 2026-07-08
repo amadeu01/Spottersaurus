@@ -9,7 +9,7 @@ struct RackItOverlayView: View {
             Image(systemName: "hand.raised.fill")
                 .font(.system(size: 42, weight: .heavy))
             Text("RACK IT")
-                .font(.system(size: 34, weight: .heavy, design: .rounded))
+                .font(.system(size: 32, weight: .heavy, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             Button(action: resolveAlert) {
@@ -20,6 +20,8 @@ struct RackItOverlayView: View {
             .tint(.white)
             .foregroundStyle(Theme.Colors.alert)
         }
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Colors.alert)
     }

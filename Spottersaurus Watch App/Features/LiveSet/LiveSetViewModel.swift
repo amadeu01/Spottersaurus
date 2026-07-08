@@ -6,7 +6,7 @@ import SpottersaurusKit
 final class LiveSetViewModel {
     let exerciseName: String
     let lift: LiftKind
-    let targetReps: Int
+    var targetReps: Int
     var weightKg: Double
     var heartRate: Int
     var velocityMS: Double
@@ -17,6 +17,9 @@ final class LiveSetViewModel {
     private var warmupMotionSamples: [MotionSample] = []
     private var motionSamples: [MotionSample] = []
     private var heartRateSamples: [HRSample] = []
+    private var repMetrics: [RepMetricEnvelope] = []
+    private var spotEvents: [SpotEventEnvelope] = []
+    private var setStartedAt: Date?
     private var processedRepCount = 0
     private var spotEngine: SpotEngine
     private let targetWarmupReps = 3
@@ -86,6 +89,21 @@ final class LiveSetViewModel {
         return "\(values.repCount) reps, tempo \(tempo)"
     }
 
+    var sensorStatusText: String {
+        let samples = motionSamples.count + warmupMotionSamples.count
+        guard samples > 0 else { return "Motion: waiting" }
+        return "Motion: \(samples) samples"
+    }
+
+    var liveTickEnvelope: LiveTickEnvelope {
+        LiveTickEnvelope(
+            repCount: repCount,
+            currentVelocityMS: velocityMS,
+            heartRateBPM: Double(heartRate),
+            elapsedSeconds: setStartedAt.map { max(Date().timeIntervalSince($0), 0) } ?? 0
+        )
+    }
+
     var gaugeProgress: Double {
         if lifecycle.state == .resting || lifecycle.state == .racked {
             return min(max(restElapsed / lifecycle.restSeconds, 0), 1)
@@ -97,6 +115,10 @@ final class LiveSetViewModel {
         guard lifecycle.state == .resting || lifecycle.state == .racked else { return "--" }
         let remaining = max(Int(lifecycle.restSeconds - restElapsed), 0)
         return "\(remaining)s"
+    }
+
+    var targetRepsText: String {
+        "\(targetReps)"
     }
 
     var statusText: String {
@@ -132,28 +154,35 @@ final class LiveSetViewModel {
         }
     }
 
-    func arm() {
+    func arm(logger: any AppLogger = LoggerGroup.watch) {
+        logger.notice(.liveSet, "arming set lift=\(lift.rawValue) targetReps=\(targetReps) weightKg=\(weightKg)")
         lifecycle.arm()
         calibrationState = .ready(currentCalibration)
         restElapsed = 0
         motionSamples = []
         heartRateSamples = []
+        repMetrics = []
+        spotEvents = []
+        setStartedAt = Date()
         processedRepCount = 0
     }
 
-    func startWarmupCalibration() {
+    func startWarmupCalibration(logger: any AppLogger = LoggerGroup.watch) {
+        logger.notice(.calibration, "starting warmup calibration lift=\(lift.rawValue)")
         warmupMotionSamples = []
         calibrationState = .collecting(candidate: nil)
     }
 
-    func finishWarmupCalibration() {
+    func finishWarmupCalibration(logger: any AppLogger = LoggerGroup.watch) {
         let values = currentCalibration
         guard values.repCount > 0 else {
+            logger.warning(.calibration, "warmup calibration had no clean reps; using fallback lift=\(lift.rawValue)")
             calibrationState = .fallback(CalibrationValues.fallback(for: lift))
             spotEngine = SpotEngine(lift: lift, calibration: currentCalibration)
             return
         }
 
+        logger.notice(.calibration, "saved calibration lift=\(lift.rawValue) reps=\(values.repCount) tempo=\(values.baselineConcentricSeconds) lower=\(values.velocityBandLowerMS) upper=\(values.velocityBandUpperMS)")
         calibrationState = .ready(values)
         spotEngine = SpotEngine(lift: lift, calibration: values)
     }
@@ -172,7 +201,8 @@ final class LiveSetViewModel {
         lifecycle.handle(spotEvent: spotEvent(kind: .rackIt, confidence: 0.94, reason: .sustainedPin))
     }
 
-    func rack() {
+    func rack(logger: any AppLogger = LoggerGroup.watch) {
+        logger.notice(.liveSet, "racking set reps=\(repCount)")
         if lifecycle.state == .armed {
             lifecycle.repCompleted()
         }
@@ -181,9 +211,43 @@ final class LiveSetViewModel {
         lifecycle.restTick(elapsed: restElapsed)
     }
 
-    func finishRest() {
+    func finishRest(logger: any AppLogger = LoggerGroup.watch) {
+        logger.info(.liveSet, "finishing rest")
         restElapsed = lifecycle.restSeconds
         lifecycle.restTick(elapsed: restElapsed)
+    }
+
+    func setTargetReps(_ value: Double) {
+        targetReps = min(max(Int(value.rounded()), 1), 20)
+    }
+
+    func restTick(elapsed: TimeInterval, logger: any AppLogger = LoggerGroup.watch) -> Bool {
+        let wasComplete = lifecycle.state == .complete
+        restElapsed = elapsed
+        lifecycle.restTick(elapsed: elapsed)
+        let didComplete = !wasComplete && lifecycle.state == .complete
+        if didComplete {
+            logger.notice(.liveSet, "rest completed elapsed=\(elapsed)")
+        }
+        return didComplete
+    }
+
+    func finishedSessionEnvelope() -> SessionEnvelope? {
+        guard let setStartedAt, repCount > 0 else { return nil }
+
+        let avgVelocity = repMetrics.isEmpty ? velocityMS : repMetrics.map(\.meanVelocityMS).reduce(0, +) / Double(repMetrics.count)
+        let peakVelocity = max(repMetrics.map(\.peakVelocityMS).max() ?? 0, velocityMS)
+        let completedSet = CompletedSetEnvelope(
+            lift: lift,
+            startedAt: setStartedAt,
+            weightKg: weightKg,
+            repsCompleted: repCount,
+            repMetrics: repMetrics,
+            spotEvents: spotEvents,
+            avgConcentricVelocityMS: avgVelocity,
+            peakConcentricVelocityMS: peakVelocity
+        )
+        return SessionEnvelope(date: setStartedAt, sets: [completedSet])
     }
 
     func resolveAlert() {
@@ -206,10 +270,30 @@ final class LiveSetViewModel {
         let analysis = spotEngine.process(motion: motionSamples, hr: heartRateSamples)
         for rep in analysis.reps where rep.repIndex >= processedRepCount {
             lifecycle.repCompleted()
+            repMetrics.append(
+                RepMetricEnvelope(
+                    repIndex: rep.repIndex,
+                    concentricSeconds: rep.concentricSeconds,
+                    peakVelocityMS: rep.peakVelocityMS,
+                    meanVelocityMS: rep.meanVelocityMS,
+                    romProxy: rep.displacementM,
+                    flaggedStall: rep.flaggedStall
+                )
+            )
             processedRepCount = rep.repIndex + 1
             velocityMS = max(0, rep.meanVelocityMS)
         }
         for event in analysis.events {
+            let envelope = SpotEventEnvelope(
+                stage: event.kind,
+                timestamp: event.timestamp,
+                repIndex: event.repIndex,
+                confidence: event.confidence,
+                reason: event.reason
+            )
+            if !spotEvents.contains(envelope) {
+                spotEvents.append(envelope)
+            }
             lifecycle.handle(spotEvent: event)
         }
     }

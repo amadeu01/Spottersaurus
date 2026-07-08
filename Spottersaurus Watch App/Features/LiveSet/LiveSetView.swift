@@ -3,22 +3,31 @@ import Observation
 import SpottersaurusKit
 
 struct LiveSetView: View {
+    @Environment(\.watchDependencies) private var dependencies
     @State private var viewModel: LiveSetViewModel
     @State private var sessionCoordinator = WatchLiveSessionCoordinator()
+    @State private var feedback = WatchLiveSetFeedback()
+    @State private var restStartedAt: Date?
+    @State private var lastFeedbackAlertStage: AlertStage = .none
+    @State private var crownMode: LiveSetCrownMode
+    @State private var crownValue: Double
     @FocusState private var crownFocused: Bool
 
     init(plannedSet: PlannedSetEnvelope) {
         _viewModel = State(initialValue: LiveSetViewModel(plannedSet: plannedSet))
+        _crownMode = State(initialValue: .load)
+        _crownValue = State(initialValue: plannedSet.weightKg)
     }
 
     var body: some View {
-        @Bindable var viewModel = viewModel
-
         ZStack {
             Theme.Colors.canvas.ignoresSafeArea()
 
             if viewModel.isRackItOverlayVisible {
-                RackItOverlayView(resolveAlert: viewModel.resolveAlert)
+                RackItOverlayView(resolveAlert: {
+                    viewModel.resolveAlert()
+                    lastFeedbackAlertStage = .none
+                })
             } else {
                 ScrollView {
                     VStack(spacing: Theme.Spacing.sm) {
@@ -40,41 +49,68 @@ struct LiveSetView: View {
                             velocityMS: viewModel.velocityMS,
                             heartRate: viewModel.heartRate,
                             weightKg: viewModel.weightKg,
-                            restText: viewModel.restText
+                            restText: viewModel.restText,
+                            targetReps: viewModel.targetRepsText
                         )
+                        if viewModel.state == .idle || viewModel.state == .complete {
+                            LiveSetCrownModeControlView(
+                                mode: crownMode,
+                                selectLoad: {
+                                    crownMode = .load
+                                    crownValue = viewModel.weightKg
+                                },
+                                selectReps: {
+                                    crownMode = .reps
+                                    crownValue = Double(viewModel.targetReps)
+                                }
+                            )
+                        }
                         if viewModel.state == .idle || viewModel.state == .complete {
                             LiveSetCalibrationPanelView(
                                 statusText: viewModel.calibrationStatusText,
-                                detailText: viewModel.calibrationDetailText,
+                                detailText: "\(viewModel.calibrationDetailText) \(viewModel.sensorStatusText)",
                                 progress: viewModel.calibrationProgress,
                                 isCollecting: viewModel.isCalibrating,
                                 start: {
-                                    viewModel.startWarmupCalibration()
-                                    sessionCoordinator.startMotion(viewModel: viewModel)
+                                    viewModel.startWarmupCalibration(logger: dependencies.logger)
+                                    sessionCoordinator.start(
+                                        viewModel: viewModel,
+                                        logger: dependencies.logger,
+                                        onLiveTick: dependencies.sendLiveTick
+                                    )
                                 },
                                 finish: {
-                                    viewModel.finishWarmupCalibration()
-                                    sessionCoordinator.stop()
+                                    viewModel.finishWarmupCalibration(logger: dependencies.logger)
+                                    sessionCoordinator.stop(logger: dependencies.logger)
                                 }
                             )
                         }
                         LiveSetControlsView(
                             state: viewModel.state,
                             arm: {
-                                sessionCoordinator.stop()
-                                viewModel.arm()
-                                sessionCoordinator.start(viewModel: viewModel)
+                                sessionCoordinator.stop(logger: dependencies.logger)
+                                viewModel.arm(logger: dependencies.logger)
+                                sessionCoordinator.start(
+                                    viewModel: viewModel,
+                                    logger: dependencies.logger,
+                                    onLiveTick: dependencies.sendLiveTick
+                                )
                             },
                             completeRep: viewModel.completeRep,
                             flagGrinding: viewModel.flagGrinding,
                             rackIt: viewModel.rackIt,
                             rack: {
-                                viewModel.rack()
-                                sessionCoordinator.stop()
+                                viewModel.rack(logger: dependencies.logger)
+                                restStartedAt = Date()
+                                sessionCoordinator.stop(logger: dependencies.logger)
                             },
                             finishRest: {
-                                viewModel.finishRest()
-                                sessionCoordinator.stop()
+                                viewModel.finishRest(logger: dependencies.logger)
+                                sessionCoordinator.stop(logger: dependencies.logger)
+                                if let envelope = viewModel.finishedSessionEnvelope() {
+                                    dependencies.sendFinishedSession(envelope)
+                                }
+                                restStartedAt = nil
                             }
                         )
                     }
@@ -84,20 +120,86 @@ struct LiveSetView: View {
             }
         }
         .foregroundStyle(.white)
-        .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.alertStage)
-        .digitalCrownRotation(
-            $viewModel.weightKg,
-            from: 20,
-            through: 320,
-            by: 2.5,
-            sensitivity: .medium,
-            isContinuous: false,
-            isHapticFeedbackEnabled: true
+        .liveSetCrownRotation(
+            enabled: crownEditingEnabled,
+            value: $crownValue,
+            mode: crownMode,
+            focused: $crownFocused
         )
-        .focusable()
-        .focused($crownFocused)
+        .onChange(of: crownValue) { _, newValue in
+            switch crownMode {
+            case .load:
+                viewModel.weightKg = newValue
+            case .reps:
+                viewModel.setTargetReps(newValue)
+            }
+        }
+        .onChange(of: viewModel.alertStage) { _, newStage in
+            playAlertFeedbackIfNeeded(newStage)
+        }
+        .onChange(of: crownEditingEnabled) { _, isEnabled in
+            crownFocused = isEnabled
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now in
+            guard let restStartedAt else { return }
+            let completed = viewModel.restTick(
+                elapsed: now.timeIntervalSince(restStartedAt),
+                logger: dependencies.logger
+            )
+            if completed {
+                feedback.playRestCompleteCue()
+                self.restStartedAt = nil
+            }
+        }
+        .onAppear {
+            feedback = WatchLiveSetFeedback(logger: dependencies.logger)
+            crownFocused = crownEditingEnabled
+        }
         .onDisappear {
-            sessionCoordinator.stop()
+            sessionCoordinator.stop(logger: dependencies.logger)
+        }
+    }
+
+    private var crownEditingEnabled: Bool {
+        viewModel.state == .idle || viewModel.state == .complete
+    }
+
+    private func playAlertFeedbackIfNeeded(_ stage: AlertStage) {
+        guard stage != lastFeedbackAlertStage else { return }
+        lastFeedbackAlertStage = stage
+        switch stage {
+        case .none:
+            break
+        case .grinding:
+            feedback.playGrindingCue()
+        case .rackIt:
+            feedback.playRackItCue()
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func liveSetCrownRotation(
+        enabled: Bool,
+        value: Binding<Double>,
+        mode: LiveSetCrownMode,
+        focused: FocusState<Bool>.Binding
+    ) -> some View {
+        if enabled {
+            digitalCrownRotation(
+                value,
+                from: mode == .load ? 20 : 1,
+                through: mode == .load ? 320 : 20,
+                by: mode == .load ? 2.5 : 1,
+                sensitivity: .medium,
+                isContinuous: false,
+                isHapticFeedbackEnabled: true
+            )
+            .focusable()
+            .focused(focused)
+        } else {
+            self
         }
     }
 }

@@ -142,17 +142,22 @@ for Xcode / later phases to avoid risking the iOS build):
 - [x] Concentric `Circle().trim` ring gauge per rep (2026-07-08)
       <!-- Uses shared `RingGauge` with rep/rest progress. -->
 - [x] State tinting: neutral → amber (grinding) → red (RACK IT) with pulsing border (2026-07-08)
-- [ ] Escalating alert: `.sensoryFeedback` haptics + audio cue + full-screen RACK IT
-      <!-- Full-screen RACK IT + haptic trigger implemented; audio cue remains
-           open until the real watchOS session/audio path is wired. -->
-- [ ] Rest timer ring + completion haptic
-      <!-- Rest progress display exists in `LiveSetView`; completion haptic
-           remains open until real timer/session wiring exists. -->
-- [ ] Crown-scrub weight/reps; 44pt targets; safe areas
-      <!-- Digital Crown adjusts load; buttons use 44pt minimum hit targets.
-           Target reps now come from the injected `WatchPlannedSet`; real data
-           should arrive through WatchLink once session loading exists. -->
-- [ ] Verify: visual pass on Watch, dark-first OLED
+- [x] Escalating alert: `.sensoryFeedback` haptics + audio cue + full-screen RACK IT (2026-07-08)
+      <!-- Full-screen RACK IT overlay now pairs escalating watch haptics with
+           a spoken "Rack it" cue through AVFoundation. Alert feedback is
+           deduped per alert stage so repeated renders do not spam the wearer. -->
+- [x] Rest timer ring + completion haptic (2026-07-08)
+      <!-- Rack starts the injected rest window, ticks once per second through
+           the pure lifecycle controller, updates the rest ring/text, and plays
+           a completion haptic when rest reaches the programmed duration. -->
+- [x] Crown-scrub weight/reps; 44pt targets; safe areas (2026-07-08)
+      <!-- Digital Crown mode toggles between load and target reps; mode
+           controls are 44pt icon buttons and the RACK IT overlay is padded to
+           respect compact Watch safe areas. -->
+- [x] Verify: visual pass on Watch, dark-first OLED (2026-07-08)
+      <!-- User verified the live Watch UI running on-device. Dark-first OLED
+           layout, compact states, Crown controls, and RACK IT overlay are
+           accepted for this phase. -->
 
 ## Phase 6 — Sync (Watch ↔ iPhone)
 - [x] `SessionEnvelope` Codable DTOs (2026-07-08)
@@ -162,7 +167,12 @@ for Xcode / later phases to avoid risking the iOS build):
            SpotEventKind/SpotReason + Epley (no dup). 8 round-trip tests.
            NOTE: WatchLink encoder must set JSONEncoder.dateEncodingStrategy =
            .iso8601 — Foundation's default is a raw reference-date double. -->
-- [ ] `WatchLink` WCSession wrapper: live set streaming + finished-session handoff
+- [x] `WatchLink` WCSession wrapper: live set streaming + finished-session handoff (2026-07-08)
+      <!-- Existing iPhone->Watch planned-session link now has the reverse path:
+           Watch sends LiveTickEnvelope while reachable and queues finished
+           SessionEnvelope handoffs via WCSession userInfo when needed. iPhone
+           WatchLink decodes the handoff and imports it through SessionImporter.
+           Real paired-device delivery still needs validation. -->
 - [x] Persist finished session to SwiftData (envelope→model importer) (2026-07-08)
       <!-- TDD, hardware-free. Persistence/SessionImporter.swift: upsert-by-id
            (no dupes on re-delivery), rep order via repIndex, SpotEvent→
@@ -170,6 +180,9 @@ for Xcode / later phases to avoid risking the iOS build):
            Exercise per LiftKind. In-memory ModelContext tests. 6 tests. -->
 - [ ] Write finished workout to HealthKit (on-device)
 - [ ] Verify: standalone Watch session appears in iPhone history + Apple Health
+      <!-- Watch->iPhone handoff code is wired; needs paired-device validation
+           that a real Watch set lands in iPhone history. HealthKit write remains
+           separate/open. -->
 
 ## Phase 7 — iPhone planner
 - [x] Today / Start screen; Send-to-Watch; standalone-start fallback (2026-07-08)
@@ -203,12 +216,18 @@ for Xcode / later phases to avoid risking the iOS build):
            phone-to-watch delivery still needs paired-device validation. -->
 
 ## Phase 8 — iPhone review / analytics
-- [ ] History list → session → set detail (per-rep metrics, spotter events, e1RM)
+- [x] History list → session → set detail (per-rep metrics, spotter events, e1RM) (2026-07-08)
+      <!-- Added iPhone Review tab with a History section. Logged
+           WorkoutSessions drill into ordered CompletedSets, per-rep metrics,
+           spotter events, set velocity summaries, tonnage, and derived e1RM. -->
 - [x] Analytics compute layer (pure): e1RM trend, tonnage series, VBT velocity-at-load, spotter-event freq (2026-07-08)
       <!-- TDD, hardware-free. Sources/.../Analytics/ (SetRecord value type +
            PerformanceAnalytics pure funcs). Reuses Epley (no dup). 11 tests.
            Charts UI below consumes these. -->
-- [ ] Swift Charts: e1RM trend, volume/tonnage, VBT velocity-at-load, spotter-event freq (wire to Analytics layer)
+- [x] Swift Charts: e1RM trend, volume/tonnage, VBT velocity-at-load, spotter-event freq (wire to Analytics layer) (2026-07-08)
+      <!-- Review > Analytics maps SwiftData sessions to SetRecord inputs and
+           renders e1RM trend, tonnage, velocity-at-load, and spotter-event
+           charts from the pure PerformanceAnalytics layer. -->
 - [ ] Verify: charts render from real logged sessions
 
 ## Phase 9 — Human spotter
