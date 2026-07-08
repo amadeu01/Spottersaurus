@@ -13,12 +13,17 @@ final class LiveSetViewModel {
     var restElapsed: TimeInterval
 
     private var lifecycle: SetLifecycleController
+    private var calibrationState: LiveSetCalibrationState
+    private var warmupMotionSamples: [MotionSample] = []
     private var motionSamples: [MotionSample] = []
     private var heartRateSamples: [HRSample] = []
     private var processedRepCount = 0
-    private let spotEngine: SpotEngine
+    private var spotEngine: SpotEngine
+    private let targetWarmupReps = 3
 
     init(plannedSet: PlannedSetEnvelope, heartRate: Int = 132, velocityMS: Double = 0.42) {
+        let fallbackCalibration = CalibrationValues.fallback(for: plannedSet.lift)
+
         self.exerciseName = plannedSet.exerciseName
         self.lift = plannedSet.lift
         self.targetReps = plannedSet.targetReps
@@ -27,16 +32,8 @@ final class LiveSetViewModel {
         self.velocityMS = velocityMS
         self.restElapsed = 0
         self.lifecycle = SetLifecycleController(restSeconds: TimeInterval(plannedSet.restSeconds))
-        self.spotEngine = SpotEngine(
-            lift: plannedSet.lift,
-            calibration: CalibrationValues(
-                lift: plannedSet.lift,
-                baselineConcentricSeconds: 1.0,
-                velocityBandLowerMS: plannedSet.lift.usesVelocityPath ? 0.18 : 0,
-                velocityBandUpperMS: plannedSet.lift.usesVelocityPath ? 0.75 : 0,
-                repCount: 0
-            )
-        )
+        self.calibrationState = .fallback(fallbackCalibration)
+        self.spotEngine = SpotEngine(lift: plannedSet.lift, calibration: fallbackCalibration)
     }
 
     var state: SetLifecycleState {
@@ -53,6 +50,40 @@ final class LiveSetViewModel {
 
     var isRackItOverlayVisible: Bool {
         lifecycle.alertStage == .rackIt
+    }
+
+    var isCalibrating: Bool {
+        calibrationState.isCollecting
+    }
+
+    var calibrationProgress: Double {
+        min(Double(currentCalibration.repCount) / Double(targetWarmupReps), 1)
+    }
+
+    var calibrationStatusText: String {
+        switch calibrationState {
+        case .fallback:
+            "Baseline fallback"
+        case .collecting:
+            "Warmup capture"
+        case .ready:
+            "Baseline ready"
+        }
+    }
+
+    var calibrationDetailText: String {
+        let values = currentCalibration
+        guard values.repCount > 0 else {
+            return "Capture \(targetWarmupReps) clean warmup reps before the work set."
+        }
+
+        let tempo = String(format: "%.2fs", values.baselineConcentricSeconds)
+        if lift.usesVelocityPath {
+            let lower = String(format: "%.2f", values.velocityBandLowerMS)
+            let upper = String(format: "%.2f", values.velocityBandUpperMS)
+            return "\(values.repCount) reps, tempo \(tempo), \(lower)-\(upper)m/s"
+        }
+        return "\(values.repCount) reps, tempo \(tempo)"
     }
 
     var gaugeProgress: Double {
@@ -103,10 +134,28 @@ final class LiveSetViewModel {
 
     func arm() {
         lifecycle.arm()
+        calibrationState = .ready(currentCalibration)
         restElapsed = 0
         motionSamples = []
         heartRateSamples = []
         processedRepCount = 0
+    }
+
+    func startWarmupCalibration() {
+        warmupMotionSamples = []
+        calibrationState = .collecting(candidate: nil)
+    }
+
+    func finishWarmupCalibration() {
+        let values = currentCalibration
+        guard values.repCount > 0 else {
+            calibrationState = .fallback(CalibrationValues.fallback(for: lift))
+            spotEngine = SpotEngine(lift: lift, calibration: currentCalibration)
+            return
+        }
+
+        calibrationState = .ready(values)
+        spotEngine = SpotEngine(lift: lift, calibration: values)
     }
 
     func completeRep() {
@@ -142,6 +191,14 @@ final class LiveSetViewModel {
     }
 
     func ingestMotionSamples(_ samples: [MotionSample]) {
+        if calibrationState.isCollecting {
+            warmupMotionSamples.append(contentsOf: samples)
+            trimWarmupSamples()
+            let candidate = Calibration().calibrate(lift: lift, warmupMotion: warmupMotionSamples)
+            calibrationState = .collecting(candidate: candidate)
+            return
+        }
+
         guard lifecycle.state == .armed || lifecycle.state == .repping else { return }
         motionSamples.append(contentsOf: samples)
         trimSamples()
@@ -179,11 +236,25 @@ final class LiveSetViewModel {
         )
     }
 
+    private var currentCalibration: CalibrationValues {
+        switch calibrationState {
+        case .fallback(let values), .ready(let values):
+            values
+        case .collecting(let candidate):
+            candidate ?? CalibrationValues.fallback(for: lift)
+        }
+    }
+
     private func trimSamples() {
         let motionFloor = (motionSamples.last?.timestamp ?? 0) - 30
         motionSamples.removeAll { $0.timestamp < motionFloor }
 
         let hrFloor = (heartRateSamples.last?.timestamp ?? 0) - 60
         heartRateSamples.removeAll { $0.timestamp < hrFloor }
+    }
+
+    private func trimWarmupSamples() {
+        let floor = (warmupMotionSamples.last?.timestamp ?? 0) - 45
+        warmupMotionSamples.removeAll { $0.timestamp < floor }
     }
 }

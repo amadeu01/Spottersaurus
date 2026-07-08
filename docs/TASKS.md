@@ -121,7 +121,12 @@ for Xcode / later phases to avoid risking the iOS build):
            AlertStage none/grinding/rackIt. Injected time (no wall-clock), reuses
            SpotEvent. Illegal transitions ignored. 16 tests. Sensor/HK wiring
            (4a/4b) drives it on-device. -->
-- [ ] Calibration flow on warmup sets
+- [x] Calibration flow on warmup sets (2026-07-08)
+      <!-- Watch live-set screen can capture warmup motion before arming a work
+           set, derive CalibrationValues via the pure Calibration engine, show
+           detected rep/tempo/velocity-band feedback, and rebuild SpotEngine
+           with the calibrated baseline. Falls back to conservative defaults
+           when no clean warmup rep is detected. -->
 - [ ] Verify: on-device run (real IMU; Simulator can't)
       <!-- Simulator/build verification green; still needs a paired Apple Watch
            session to validate real IMU sample cadence, HealthKit authorization,

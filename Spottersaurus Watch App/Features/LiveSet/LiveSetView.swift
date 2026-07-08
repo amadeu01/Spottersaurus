@@ -42,9 +42,26 @@ struct LiveSetView: View {
                             weightKg: viewModel.weightKg,
                             restText: viewModel.restText
                         )
+                        if viewModel.state == .idle || viewModel.state == .complete {
+                            LiveSetCalibrationPanelView(
+                                statusText: viewModel.calibrationStatusText,
+                                detailText: viewModel.calibrationDetailText,
+                                progress: viewModel.calibrationProgress,
+                                isCollecting: viewModel.isCalibrating,
+                                start: {
+                                    viewModel.startWarmupCalibration()
+                                    sessionCoordinator.startMotion(viewModel: viewModel)
+                                },
+                                finish: {
+                                    viewModel.finishWarmupCalibration()
+                                    sessionCoordinator.stop()
+                                }
+                            )
+                        }
                         LiveSetControlsView(
                             state: viewModel.state,
                             arm: {
+                                sessionCoordinator.stop()
                                 viewModel.arm()
                                 sessionCoordinator.start(viewModel: viewModel)
                             },

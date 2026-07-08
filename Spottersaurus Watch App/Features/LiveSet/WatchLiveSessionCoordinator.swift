@@ -10,10 +10,14 @@ final class WatchLiveSessionCoordinator {
         workoutAdapter.isRunning || motionAdapter.isRunning
     }
 
-    func start(viewModel: LiveSetViewModel) {
+    func startMotion(viewModel: LiveSetViewModel) {
         motionAdapter.start { samples in
             viewModel.ingestMotionSamples(samples)
         }
+    }
+
+    func start(viewModel: LiveSetViewModel) {
+        startMotion(viewModel: viewModel)
 
         Task {
             do {
