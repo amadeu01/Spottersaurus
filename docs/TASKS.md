@@ -103,7 +103,12 @@ for Xcode / later phases to avoid risking the iOS build):
 - [ ] `CMBatchedSensorManager` high-rate motion stream while set armed
 - [ ] `HKLiveWorkoutBuilder` HR stream
 - [ ] Wire live samples into `SpotEngine`; emit events
-- [ ] Set lifecycle: arm → reps → auto-rack (motion settle) → rest → next
+- [x] Set lifecycle state machine: arm → reps → auto-rack → rest → next (pure) (2026-07-08)
+      <!-- TDD, hardware-free. Session/SetLifecycleController.swift: pure Sendable
+           value type, states idle/armed/repping/racked/resting/complete +
+           AlertStage none/grinding/rackIt. Injected time (no wall-clock), reuses
+           SpotEvent. Illegal transitions ignored. 16 tests. Sensor/HK wiring
+           (4a/4b) drives it on-device. -->
 - [ ] Calibration flow on warmup sets
 - [ ] Verify: on-device run (real IMU; Simulator can't)
 
@@ -125,7 +130,12 @@ for Xcode / later phases to avoid risking the iOS build):
            NOTE: WatchLink encoder must set JSONEncoder.dateEncodingStrategy =
            .iso8601 — Foundation's default is a raw reference-date double. -->
 - [ ] `WatchLink` WCSession wrapper: live set streaming + finished-session handoff
-- [ ] Persist finished session to SwiftData; write workout to HealthKit
+- [x] Persist finished session to SwiftData (envelope→model importer) (2026-07-08)
+      <!-- TDD, hardware-free. Persistence/SessionImporter.swift: upsert-by-id
+           (no dupes on re-delivery), rep order via repIndex, SpotEvent→
+           SpotterEvent (.resolved dropped — no matching stage), find-or-create
+           Exercise per LiftKind. In-memory ModelContext tests. 6 tests. -->
+- [ ] Write finished workout to HealthKit (on-device)
 - [ ] Verify: standalone Watch session appears in iPhone history + Apple Health
 
 ## Phase 7 — iPhone planner
