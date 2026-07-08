@@ -35,9 +35,9 @@ WatchConnectivity · Swift Charts.
 
 ## Status
 
-🚧 Early development. Phase 1 (project + shared package + Watch target scaffold) is in.
-See the full spec in [`docs/PLAN.md`](docs/PLAN.md) and the build checklist in
-[`docs/TASKS.md`](docs/TASKS.md).
+🚧 Early development. Project setup, shared model/detection/progression/analytics
+logic, and the first Watch live-set UI slice are in. See the full spec in
+[`docs/PLAN.md`](docs/PLAN.md) and the build checklist in [`docs/TASKS.md`](docs/TASKS.md).
 
 ## Build
 

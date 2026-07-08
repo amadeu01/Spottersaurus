@@ -28,10 +28,10 @@ Legend: `- [ ]` todo · `- [x] … (2026-06-29)` done.
       <!-- Phase-10 partial, hardware-free: Theme tokens + RingGauge / GlassCard /
            MetricReadout / PrimaryButton. Full end-to-end apply stays in Phase 10. -->
 - [x] Delete template `Item.swift`; gut default `ContentView` (2026-06-29)
-- [ ] Verify: `swift test` (package) green; both app targets build via `xcodebuild`
-      <!-- package `swift test` green; iOS target BUILD SUCCEEDED on iOS 26.5 sim;
-           Watch target builds NOT verified — watchOS 26.5 simulator runtime not
-           installed on the build machine (install via Xcode > Settings > Components). -->
+- [x] Verify: `swift test` (package) green; both app targets build via `xcodebuild` (2026-07-08)
+      <!-- package `swift test` green: 60 XCTest tests + 18 Swift Testing tests.
+           iOS target BUILD SUCCEEDED on iPhone 17 sim. Watch target BUILD
+           SUCCEEDED with `generic/platform=watchOS Simulator`. -->
 
 ### Phase 1 — notes / remaining manual Xcode steps
 The Watch target + package linkage were added programmatically via the `xcodeproj`
@@ -43,11 +43,9 @@ for Xcode / later phases to avoid risking the iOS build):
 - **Embed Watch app into iOS app**: add the "Embed Watch Content" copy-files phase
   on the `Spottersaurus` target (and confirm companion pairing) in Xcode so the
   watch app ships inside the iOS app. The watch target builds standalone today.
-- **Entitlements** (HealthKit, CloudKit `.private`, App Groups for WatchConnectivity)
-  and **Info.plist usage strings** (Motion & Fitness, HealthKit, audio) — Phase 1
-  checklist items above, not yet added.
-- **Verify the Watch build**: install the watchOS 26.5 simulator runtime, then
-  `xcodebuild build -scheme "Spottersaurus Watch App" -destination "platform=watchOS Simulator,name=<watch>"`.
+- **Real-device capability check**: the entitlement files and usage strings are
+  present, but HealthKit/CloudKit capabilities still need to be enabled on the
+  App ID in the Developer portal before real-device signing and CloudKit testing.
 - `Package.swift` uses `// swift-tools-version: 6.2` (not 6.0): `.iOS(.v26)` /
   `.watchOS(.v26)` require PackageDescription 6.2+. Toolchain is Swift 6.3.3, so 6.2
   is accepted; platforms remain `.v26` as specified.
@@ -113,12 +111,24 @@ for Xcode / later phases to avoid risking the iOS build):
 - [ ] Verify: on-device run (real IMU; Simulator can't)
 
 ## Phase 5 — Watch UI (native-ported design)
-- [ ] Live set screen: rep counter, concentric velocity, weight, HR (monospaced digits)
-- [ ] Concentric `Circle().trim` ring gauge per rep
-- [ ] State tinting: neutral → amber (grinding) → red (RACK IT) with pulsing border
+- [x] Live set screen: rep counter, concentric velocity, weight, HR (monospaced digits) (2026-07-08)
+      <!-- `Spottersaurus Watch App/LiveSetView.swift` replaces the placeholder
+           root with a deterministic live-set surface driven by
+           `SetLifecycleController`. Hardware session wiring still replaces the
+           local demo controls in Phase 4. -->
+- [x] Concentric `Circle().trim` ring gauge per rep (2026-07-08)
+      <!-- Uses shared `RingGauge` with rep/rest progress. -->
+- [x] State tinting: neutral → amber (grinding) → red (RACK IT) with pulsing border (2026-07-08)
 - [ ] Escalating alert: `.sensoryFeedback` haptics + audio cue + full-screen RACK IT
+      <!-- Full-screen RACK IT + haptic trigger implemented; audio cue remains
+           open until the real watchOS session/audio path is wired. -->
 - [ ] Rest timer ring + completion haptic
+      <!-- Rest progress display exists in `LiveSetView`; completion haptic
+           remains open until real timer/session wiring exists. -->
 - [ ] Crown-scrub weight/reps; 44pt targets; safe areas
+      <!-- Digital Crown adjusts load; buttons use 44pt minimum hit targets.
+           Target reps are local state today and should be driven by planned-set
+           data once Watch session loading exists. -->
 - [ ] Verify: visual pass on Watch, dark-first OLED
 
 ## Phase 6 — Sync (Watch ↔ iPhone)
