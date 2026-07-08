@@ -40,29 +40,21 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		89BC9BB32FF31AC50057D47D /* Spottersaurus */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = Spottersaurus;
 			sourceTree = "<group>";
 		};
 		89BC9BC32FF31AC70057D47D /* SpottersaurusTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = SpottersaurusTests;
 			sourceTree = "<group>";
 		};
 		89BC9BCD2FF31AC70057D47D /* SpottersaurusUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = SpottersaurusUITests;
 			sourceTree = "<group>";
 		};
 		CB061F32A3F9A51A7B602829 /* Spottersaurus Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "Spottersaurus Watch App";
 			sourceTree = "<group>";
 		};
@@ -266,7 +258,7 @@
 			mainGroup = 89BC9BA82FF31AC50057D47D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */,
+				E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "Packages/SpottersaurusKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 89BC9BB22FF31AC50057D47D /* Products */;
@@ -367,7 +359,11 @@
 				DEVELOPMENT_TEAM = YMWQA4CLV6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = "Spottersaurus Watch App/Spottersaurus Watch App.entitlements";
 				INFOPLIST_KEY_CFBundleDisplayName = Spottersaurus;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Spottersaurus reads your heart rate during a set to spot for a grinding rep.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Spottersaurus saves your finished lifting sessions to Health.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Spottersaurus reads wrist motion to track bar speed and detect a stalling rep.";
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = amadeu.dev.Spottersaurus;
 				MARKETING_VERSION = 1.0;
@@ -394,7 +390,11 @@
 				DEVELOPMENT_TEAM = YMWQA4CLV6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = "Spottersaurus Watch App/Spottersaurus Watch App.entitlements";
 				INFOPLIST_KEY_CFBundleDisplayName = Spottersaurus;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Spottersaurus reads your heart rate during a set to spot for a grinding rep.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Spottersaurus saves your finished lifting sessions to Health.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Spottersaurus reads wrist motion to track bar speed and detect a stalling rep.";
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = amadeu.dev.Spottersaurus;
 				MARKETING_VERSION = 1.0;
@@ -540,7 +540,12 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
+				CODE_SIGN_ENTITLEMENTS = Spottersaurus/Spottersaurus.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Spottersaurus reads your heart rate during a set to spot for a grinding rep.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Spottersaurus saves your finished lifting sessions to Health.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Spottersaurus reads wrist motion to track bar speed and detect a stalling rep.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -585,7 +590,12 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
+				CODE_SIGN_ENTITLEMENTS = Spottersaurus/Spottersaurus.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Spottersaurus reads your heart rate during a set to spot for a grinding rep.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Spottersaurus saves your finished lifting sessions to Health.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Spottersaurus reads wrist motion to track bar speed and detect a stalling rep.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -771,7 +781,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */ = {
+		E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "Packages/SpottersaurusKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/SpottersaurusKit;
 		};
@@ -780,12 +790,12 @@
 /* Begin XCSwiftPackageProductDependency section */
 		3C68AE2D3916E16DB1ABDBF8 /* SpottersaurusKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */;
+			package = E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "Packages/SpottersaurusKit" */;
 			productName = SpottersaurusKit;
 		};
 		E80C4A7F1F38EE7D87177D25 /* SpottersaurusKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "SpottersaurusKit" */;
+			package = E8F567BEAD1605D4C8CF507E /* XCLocalSwiftPackageReference "Packages/SpottersaurusKit" */;
 			productName = SpottersaurusKit;
 		};
 /* End XCSwiftPackageProductDependency section */

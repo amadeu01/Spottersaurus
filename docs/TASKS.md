@@ -12,8 +12,21 @@ Legend: `- [ ]` todo · `- [x] … (2026-06-29)` done.
 - [x] Package source dirs: `Model/`, `Detection/`, `Sync/`, `Design/`, plus `Tests/` (2026-06-29)
 - [x] Add `Spottersaurus Watch App` watchOS target to the Xcode project (2026-06-29)
 - [x] Link `SpottersaurusKit` to iOS + Watch targets (2026-06-29)
-- [ ] Entitlements: HealthKit, CloudKit (private), App Groups (WatchConnectivity)
-- [ ] Info.plist usage strings: HealthKit, Motion & Fitness, microphone/audio if needed
+- [x] Entitlements: HealthKit, CloudKit (private), App Groups (WatchConnectivity) (2026-07-08)
+      <!-- Added `Spottersaurus/Spottersaurus.entitlements` +
+           `Spottersaurus Watch App/Spottersaurus Watch App.entitlements`
+           (healthkit, icloud-services=CloudKit, container
+           `iCloud.amadeu.dev.Spottersaurus`, app group
+           `group.amadeu.dev.Spottersaurus`). CODE_SIGN_ENTITLEMENTS wired on all
+           4 target configs. NOTE: capabilities must still be enabled on the App
+           ID in the Developer portal before real-device/CloudKit signing. -->
+- [x] Info.plist usage strings: HealthKit, Motion & Fitness, microphone/audio if needed (2026-07-08)
+      <!-- INFOPLIST_KEY_NSHealthShareUsageDescription / NSHealthUpdateUsage /
+           NSMotionUsageDescription on iOS + Watch configs. Audio alerts play via
+           the workout session and need no usage string; mic not requested. -->
+- [x] Design system tokens + reusable views (`Design/`) (2026-07-08)
+      <!-- Phase-10 partial, hardware-free: Theme tokens + RingGauge / GlassCard /
+           MetricReadout / PrimaryButton. Full end-to-end apply stays in Phase 10. -->
 - [x] Delete template `Item.swift`; gut default `ContentView` (2026-06-29)
 - [ ] Verify: `swift test` (package) green; both app targets build via `xcodebuild`
       <!-- package `swift test` green; iOS target BUILD SUCCEEDED on iOS 26.5 sim;
@@ -104,7 +117,13 @@ for Xcode / later phases to avoid risking the iOS build):
 - [ ] Verify: visual pass on Watch, dark-first OLED
 
 ## Phase 6 — Sync (Watch ↔ iPhone)
-- [ ] `SessionEnvelope` Codable DTOs
+- [x] `SessionEnvelope` Codable DTOs (2026-07-08)
+      <!-- TDD, hardware-free. Expanded Sync/SessionEnvelope.swift: RepMetric/
+           SpotEvent/Calibration/LiveTick envelopes + richer CompletedSetEnvelope
+           (per-rep metrics, spot events, avg/peak velocity, Epley e1RM). Reuses
+           SpotEventKind/SpotReason + Epley (no dup). 8 round-trip tests.
+           NOTE: WatchLink encoder must set JSONEncoder.dateEncodingStrategy =
+           .iso8601 — Foundation's default is a raw reference-date double. -->
 - [ ] `WatchLink` WCSession wrapper: live set streaming + finished-session handoff
 - [ ] Persist finished session to SwiftData; write workout to HealthKit
 - [ ] Verify: standalone Watch session appears in iPhone history + Apple Health
@@ -112,13 +131,21 @@ for Xcode / later phases to avoid risking the iOS build):
 ## Phase 7 — iPhone planner
 - [ ] Today / Start screen; Send-to-Watch; standalone-start fallback
 - [ ] Program builder: days → planned sets (exercise, sets×reps, weight/%1RM, AMRAP, rest)
-- [ ] Load 5/3/1 + linear presets; auto-progress weights from `UserMaxes`
+- [x] Progression engine (pure math): 5/3/1 TM + week schemes, linear bump, %1RM→kg resolve (2026-07-08)
+      <!-- TDD, hardware-free. Sources/.../Progression/ (core + FiveThreeOne +
+           Linear). Rounds to barbell increment (nearest, tie away from zero).
+           18 tests. Preset-load + auto-progress UI still to wire. -->
+- [ ] Load 5/3/1 + linear presets; auto-progress weights from `UserMaxes` (wire engine into builder UI)
 - [ ] Maxes editor; calibration view/reset
 - [ ] Verify: build a program → loads on Watch
 
 ## Phase 8 — iPhone review / analytics
 - [ ] History list → session → set detail (per-rep metrics, spotter events, e1RM)
-- [ ] Swift Charts: e1RM trend, volume/tonnage, VBT velocity-at-load, spotter-event freq
+- [x] Analytics compute layer (pure): e1RM trend, tonnage series, VBT velocity-at-load, spotter-event freq (2026-07-08)
+      <!-- TDD, hardware-free. Sources/.../Analytics/ (SetRecord value type +
+           PerformanceAnalytics pure funcs). Reuses Epley (no dup). 11 tests.
+           Charts UI below consumes these. -->
+- [ ] Swift Charts: e1RM trend, volume/tonnage, VBT velocity-at-load, spotter-event freq (wire to Analytics layer)
 - [ ] Verify: charts render from real logged sessions
 
 ## Phase 9 — Human spotter

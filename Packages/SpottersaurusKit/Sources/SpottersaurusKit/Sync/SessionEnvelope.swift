@@ -10,9 +10,122 @@
 
 import Foundation
 
+/// Codable projection of a single `RepMetric` — the detection engine's
+/// per-rep output, mirrored for the Watch -> iPhone handoff.
+public struct RepMetricEnvelope: Codable, Sendable, Equatable {
+    /// Zero-based position of this rep within its set.
+    public var repIndex: Int
+    /// Concentric (lifting phase) duration, in seconds.
+    public var concentricSeconds: Double
+    /// Peak concentric velocity, in metres per second (VBT).
+    public var peakVelocityMS: Double
+    /// Mean concentric velocity, in metres per second (VBT).
+    public var meanVelocityMS: Double
+    /// Range-of-motion proxy (integrated displacement, normalised). Unitless.
+    public var romProxy: Double
+    /// Whether the engine flagged this rep as a stall / grind.
+    public var flaggedStall: Bool
+
+    public init(
+        repIndex: Int,
+        concentricSeconds: Double,
+        peakVelocityMS: Double,
+        meanVelocityMS: Double,
+        romProxy: Double = 0,
+        flaggedStall: Bool = false
+    ) {
+        self.repIndex = repIndex
+        self.concentricSeconds = concentricSeconds
+        self.peakVelocityMS = peakVelocityMS
+        self.meanVelocityMS = meanVelocityMS
+        self.romProxy = romProxy
+        self.flaggedStall = flaggedStall
+    }
+}
+
+/// Codable projection of a single `SpotEvent` emitted by `SpotEngine` — the
+/// escalation stage, when it fired, which rep, and why. Reuses the engine's
+/// own `SpotEventKind` / `SpotReason` enums (already `Codable`/`Sendable`)
+/// rather than duplicating the vocabulary.
+public struct SpotEventEnvelope: Codable, Sendable, Equatable {
+    /// The two-stage escalation level (or `resolved`).
+    public var stage: SpotEventKind
+    /// Seconds since set-arm at which the condition was met.
+    public var timestamp: TimeInterval
+    /// Rep this event belongs to.
+    public var repIndex: Int
+    /// 0…1 confidence in the call.
+    public var confidence: Double
+    public var reason: SpotReason
+
+    public init(stage: SpotEventKind, timestamp: TimeInterval, repIndex: Int, confidence: Double, reason: SpotReason) {
+        self.stage = stage
+        self.timestamp = timestamp
+        self.repIndex = repIndex
+        self.confidence = confidence
+        self.reason = reason
+    }
+}
+
+/// Codable projection of a `CalibrationValues` / `CalibrationProfile` — the
+/// per-lift baseline (tempo + velocity band) captured during warmups, synced
+/// so the Watch can seed the engine without recalibrating every session.
+public struct CalibrationEnvelope: Codable, Sendable, Equatable {
+    /// The lift this profile calibrates.
+    public var lift: LiftKind
+    /// Baseline concentric duration (seconds) from clean warmup reps.
+    public var baselineConcentricSeconds: Double
+    /// Lower bound of the expected concentric velocity band, m/s.
+    public var velocityBandLowerMS: Double
+    /// Upper bound of the expected concentric velocity band, m/s.
+    public var velocityBandUpperMS: Double
+    /// Number of warmup reps the baseline was derived from.
+    public var repCount: Int
+    /// When this baseline was captured (ISO-8601 when JSON-encoded).
+    public var capturedAt: Date
+
+    public init(
+        lift: LiftKind,
+        baselineConcentricSeconds: Double,
+        velocityBandLowerMS: Double,
+        velocityBandUpperMS: Double,
+        repCount: Int = 0,
+        capturedAt: Date = Date()
+    ) {
+        self.lift = lift
+        self.baselineConcentricSeconds = baselineConcentricSeconds
+        self.velocityBandLowerMS = velocityBandLowerMS
+        self.velocityBandUpperMS = velocityBandUpperMS
+        self.repCount = repCount
+        self.capturedAt = capturedAt
+    }
+}
+
+/// A single live in-set sample, streamed from the Watch to the iPhone while a
+/// set is in progress (rep counter, current velocity, HR, elapsed time). Not
+/// persisted — purely a wire-format tick for the live mirror UI.
+public struct LiveTickEnvelope: Codable, Sendable, Equatable {
+    /// Reps completed so far in the in-progress set.
+    public var repCount: Int
+    /// Instantaneous concentric velocity, m/s (0 when between reps or on the
+    /// tempo-only squat path).
+    public var currentVelocityMS: Double
+    /// Current heart rate, beats per minute.
+    public var heartRateBPM: Double
+    /// Seconds since the set was armed (monotonic), matching the sample clock.
+    public var elapsedSeconds: TimeInterval
+
+    public init(repCount: Int, currentVelocityMS: Double, heartRateBPM: Double, elapsedSeconds: TimeInterval) {
+        self.repCount = repCount
+        self.currentVelocityMS = currentVelocityMS
+        self.heartRateBPM = heartRateBPM
+        self.elapsedSeconds = elapsedSeconds
+    }
+}
+
 /// A finished-set summary handed from the Watch executor to the iPhone
-/// reviewer. Deliberately minimal scaffolding — per-rep metrics and spotter
-/// events are layered on in later phases.
+/// reviewer: the load/reps, per-rep detail, any spotter escalations, and the
+/// velocity summary — mirrors `CompletedSet` + its `RepMetric`s.
 public struct CompletedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
     public var id: UUID
     public var lift: LiftKind
@@ -20,19 +133,41 @@ public struct CompletedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
     public var startedAt: Date
     public var weightKg: Double
     public var repsCompleted: Int
+    /// Per-rep detection output, sent alongside the summary.
+    public var repMetrics: [RepMetricEnvelope]
+    /// Spotter escalations that fired during the set.
+    public var spotEvents: [SpotEventEnvelope]
+    /// Average concentric velocity across the set, m/s (VBT).
+    public var avgConcentricVelocityMS: Double
+    /// Peak concentric velocity across the set, m/s (VBT).
+    public var peakConcentricVelocityMS: Double
 
     public init(
         id: UUID = UUID(),
         lift: LiftKind,
         startedAt: Date,
         weightKg: Double,
-        repsCompleted: Int
+        repsCompleted: Int,
+        repMetrics: [RepMetricEnvelope] = [],
+        spotEvents: [SpotEventEnvelope] = [],
+        avgConcentricVelocityMS: Double = 0,
+        peakConcentricVelocityMS: Double = 0
     ) {
         self.id = id
         self.lift = lift
         self.startedAt = startedAt
         self.weightKg = weightKg
         self.repsCompleted = repsCompleted
+        self.repMetrics = repMetrics
+        self.spotEvents = spotEvents
+        self.avgConcentricVelocityMS = avgConcentricVelocityMS
+        self.peakConcentricVelocityMS = peakConcentricVelocityMS
+    }
+
+    /// Estimated 1RM (kg) for this set via Epley — reuses the single-sourced
+    /// `Epley` estimator from the model layer so the math never drifts.
+    public var estimatedOneRepMaxKg: Double {
+        Epley.e1RM(weightKg: weightKg, reps: repsCompleted)
     }
 }
 
