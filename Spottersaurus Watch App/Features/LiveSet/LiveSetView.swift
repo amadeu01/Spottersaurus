@@ -4,6 +4,7 @@ import SpottersaurusKit
 
 struct LiveSetView: View {
     @State private var viewModel: LiveSetViewModel
+    @State private var sessionCoordinator = WatchLiveSessionCoordinator()
     @FocusState private var crownFocused: Bool
 
     init(plannedSet: PlannedSetEnvelope) {
@@ -43,12 +44,21 @@ struct LiveSetView: View {
                         )
                         LiveSetControlsView(
                             state: viewModel.state,
-                            arm: viewModel.arm,
+                            arm: {
+                                viewModel.arm()
+                                sessionCoordinator.start(viewModel: viewModel)
+                            },
                             completeRep: viewModel.completeRep,
                             flagGrinding: viewModel.flagGrinding,
                             rackIt: viewModel.rackIt,
-                            rack: viewModel.rack,
-                            finishRest: viewModel.finishRest
+                            rack: {
+                                viewModel.rack()
+                                sessionCoordinator.stop()
+                            },
+                            finishRest: {
+                                viewModel.finishRest()
+                                sessionCoordinator.stop()
+                            }
                         )
                     }
                     .padding(.horizontal, Theme.Spacing.sm)
@@ -69,6 +79,9 @@ struct LiveSetView: View {
         )
         .focusable()
         .focused($crownFocused)
+        .onDisappear {
+            sessionCoordinator.stop()
+        }
     }
 }
 

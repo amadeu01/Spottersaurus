@@ -99,10 +99,22 @@ for Xcode / later phases to avoid risking the iOS build):
            fixtures (sin² velocity bumps / grind plateau); no binary fixtures. -->
 
 ## Phase 4 — Watch session engine
-- [ ] `HKWorkoutSession` (functional strength training) lifecycle
-- [ ] `CMBatchedSensorManager` high-rate motion stream while set armed
-- [ ] `HKLiveWorkoutBuilder` HR stream
-- [ ] Wire live samples into `SpotEngine`; emit events
+- [x] `HKWorkoutSession` (functional strength training) lifecycle (2026-07-08)
+      <!-- Watch-side adapter starts/ends a functional-strength HKWorkoutSession
+           when the live set is armed/racked. Simulator and unauthorized devices
+           fall back to manual dev controls without blocking the UI. -->
+- [x] `CMBatchedSensorManager` high-rate motion stream while set armed (2026-07-08)
+      <!-- `WatchMotionStreamAdapter` consumes CMBatchedSensorManager
+           accelerometer async batches and maps them to platform-neutral
+           MotionSample timestamps relative to set arm. -->
+- [x] `HKLiveWorkoutBuilder` HR stream (2026-07-08)
+      <!-- `WatchWorkoutSessionAdapter` listens for collected heart-rate
+           statistics and maps most-recent HR to HRSample for the live set. -->
+- [x] Wire live samples into `SpotEngine`; emit events (2026-07-08)
+      <!-- `LiveSetViewModel` buffers motion/HR samples, runs the pure
+           SpotEngine, increments reps from new RepResults, updates velocity,
+           and feeds SpotEvents into SetLifecycleController. Real-device
+           threshold tuning remains under on-device verification. -->
 - [x] Set lifecycle state machine: arm → reps → auto-rack → rest → next (pure) (2026-07-08)
       <!-- TDD, hardware-free. Session/SetLifecycleController.swift: pure Sendable
            value type, states idle/armed/repping/racked/resting/complete +
@@ -111,6 +123,9 @@ for Xcode / later phases to avoid risking the iOS build):
            (4a/4b) drives it on-device. -->
 - [ ] Calibration flow on warmup sets
 - [ ] Verify: on-device run (real IMU; Simulator can't)
+      <!-- Simulator/build verification green; still needs a paired Apple Watch
+           session to validate real IMU sample cadence, HealthKit authorization,
+           and false-alarm behavior under load. -->
 
 ## Phase 5 — Watch UI (native-ported design)
 - [x] Live set screen: rep counter, concentric velocity, weight, HR (monospaced digits) (2026-07-08)

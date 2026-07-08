@@ -5,6 +5,7 @@ import SpottersaurusKit
 @Observable
 final class LiveSetViewModel {
     let exerciseName: String
+    let lift: LiftKind
     let targetReps: Int
     var weightKg: Double
     var heartRate: Int
@@ -12,15 +13,30 @@ final class LiveSetViewModel {
     var restElapsed: TimeInterval
 
     private var lifecycle: SetLifecycleController
+    private var motionSamples: [MotionSample] = []
+    private var heartRateSamples: [HRSample] = []
+    private var processedRepCount = 0
+    private let spotEngine: SpotEngine
 
     init(plannedSet: PlannedSetEnvelope, heartRate: Int = 132, velocityMS: Double = 0.42) {
         self.exerciseName = plannedSet.exerciseName
+        self.lift = plannedSet.lift
         self.targetReps = plannedSet.targetReps
         self.weightKg = plannedSet.weightKg
         self.heartRate = heartRate
         self.velocityMS = velocityMS
         self.restElapsed = 0
         self.lifecycle = SetLifecycleController(restSeconds: TimeInterval(plannedSet.restSeconds))
+        self.spotEngine = SpotEngine(
+            lift: plannedSet.lift,
+            calibration: CalibrationValues(
+                lift: plannedSet.lift,
+                baselineConcentricSeconds: 1.0,
+                velocityBandLowerMS: plannedSet.lift.usesVelocityPath ? 0.18 : 0,
+                velocityBandUpperMS: plannedSet.lift.usesVelocityPath ? 0.75 : 0,
+                repCount: 0
+            )
+        )
     }
 
     var state: SetLifecycleState {
@@ -88,6 +104,9 @@ final class LiveSetViewModel {
     func arm() {
         lifecycle.arm()
         restElapsed = 0
+        motionSamples = []
+        heartRateSamples = []
+        processedRepCount = 0
     }
 
     func completeRep() {
@@ -122,6 +141,34 @@ final class LiveSetViewModel {
         lifecycle.handle(spotEvent: spotEvent(kind: .resolved, confidence: 1, reason: .manualTap))
     }
 
+    func ingestMotionSamples(_ samples: [MotionSample]) {
+        guard lifecycle.state == .armed || lifecycle.state == .repping else { return }
+        motionSamples.append(contentsOf: samples)
+        trimSamples()
+
+        let analysis = spotEngine.process(motion: motionSamples, hr: heartRateSamples)
+        for rep in analysis.reps where rep.repIndex >= processedRepCount {
+            lifecycle.repCompleted()
+            processedRepCount = rep.repIndex + 1
+            velocityMS = max(0, rep.meanVelocityMS)
+        }
+        for event in analysis.events {
+            lifecycle.handle(spotEvent: event)
+        }
+    }
+
+    func ingestHeartRate(_ sample: HRSample) {
+        heartRateSamples.append(sample)
+        heartRate = Int(sample.beatsPerMinute.rounded())
+        trimSamples()
+    }
+
+    func autoRackFromHardware() {
+        lifecycle.autoRack()
+        restElapsed = 0
+        lifecycle.restTick(elapsed: restElapsed)
+    }
+
     private func spotEvent(kind: SpotEventKind, confidence: Double, reason: SpotReason) -> SpotEvent {
         SpotEvent(
             kind: kind,
@@ -130,5 +177,13 @@ final class LiveSetViewModel {
             confidence: confidence,
             reason: reason
         )
+    }
+
+    private func trimSamples() {
+        let motionFloor = (motionSamples.last?.timestamp ?? 0) - 30
+        motionSamples.removeAll { $0.timestamp < motionFloor }
+
+        let hrFloor = (heartRateSamples.last?.timestamp ?? 0) - 60
+        heartRateSamples.removeAll { $0.timestamp < hrFloor }
     }
 }
