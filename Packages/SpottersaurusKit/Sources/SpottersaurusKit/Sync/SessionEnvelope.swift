@@ -123,6 +123,95 @@ public struct LiveTickEnvelope: Codable, Sendable, Equatable {
     }
 }
 
+/// A single prescribed set sent from the iPhone planner to the Watch executor.
+/// This is the concrete, Watch-ready version of `PlannedSet`: percentage loads
+/// are resolved to kilograms before sending so the Watch does not need the
+/// user's full max table to start a session.
+public struct PlannedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
+    public var id: UUID
+    public var lift: LiftKind
+    public var exerciseName: String
+    public var targetReps: Int
+    public var weightKg: Double
+    public var isAMRAP: Bool
+    public var restSeconds: Int
+    public var sortIndex: Int
+
+    public init(
+        id: UUID = UUID(),
+        lift: LiftKind,
+        exerciseName: String,
+        targetReps: Int,
+        weightKg: Double,
+        isAMRAP: Bool = false,
+        restSeconds: Int = 180,
+        sortIndex: Int = 0
+    ) {
+        self.id = id
+        self.lift = lift
+        self.exerciseName = exerciseName
+        self.targetReps = targetReps
+        self.weightKg = weightKg
+        self.isAMRAP = isAMRAP
+        self.restSeconds = restSeconds
+        self.sortIndex = sortIndex
+    }
+}
+
+/// The iPhone planner's handoff to the Watch: one selected `ProgramDay` with
+/// ordered, concrete planned sets.
+public struct PlannedSessionEnvelope: Codable, Sendable, Equatable, Identifiable {
+    public var id: UUID
+    public var programName: String
+    public var dayName: String
+    public var createdAt: Date
+    public var sets: [PlannedSetEnvelope]
+
+    public init(
+        id: UUID = UUID(),
+        programName: String,
+        dayName: String,
+        createdAt: Date = Date(),
+        sets: [PlannedSetEnvelope]
+    ) {
+        self.id = id
+        self.programName = programName
+        self.dayName = dayName
+        self.createdAt = createdAt
+        self.sets = sets
+    }
+
+    public var firstSet: PlannedSetEnvelope? {
+        sets.sorted { $0.sortIndex < $1.sortIndex }.first
+    }
+
+    public static func make(
+        program: Program,
+        day: ProgramDay,
+        maxes: [UserMaxes],
+        createdAt: Date = Date()
+    ) -> PlannedSessionEnvelope {
+        PlannedSessionEnvelope(
+            programName: program.name,
+            dayName: day.name,
+            createdAt: createdAt,
+            sets: day.orderedSets.map { plannedSet in
+                let exercise = plannedSet.exercise
+                return PlannedSetEnvelope(
+                    id: plannedSet.id,
+                    lift: exercise?.kind ?? .accessory,
+                    exerciseName: exercise?.name ?? "Lift",
+                    targetReps: plannedSet.targetReps,
+                    weightKg: Progression.resolvedWeightKg(for: plannedSet, maxes: maxes),
+                    isAMRAP: plannedSet.isAMRAP,
+                    restSeconds: plannedSet.restSeconds,
+                    sortIndex: plannedSet.sortIndex
+                )
+            }
+        )
+    }
+}
+
 /// A finished-set summary handed from the Watch executor to the iPhone
 /// reviewer: the load/reps, per-rep detail, any spotter escalations, and the
 /// velocity summary — mirrors `CompletedSet` + its `RepMetric`s.

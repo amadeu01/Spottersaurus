@@ -37,7 +37,7 @@ public final class WorkoutSession {
     /// The sets performed. Cascade delete: removing the session removes its
     /// sets (and, transitively, their rep metrics).
     @Relationship(deleteRule: .cascade, inverse: \CompletedSet.session)
-    public var completedSets: [CompletedSet] = []
+    public var completedSets: [CompletedSet]?
 
     public init(
         date: Date = Date(),
@@ -55,6 +55,12 @@ public final class WorkoutSession {
 
     /// Total tonnage (kg) across all sets in the session.
     public var totalTonnageKg: Double {
-        completedSets.reduce(0) { $0 + $1.weightKg * Double($1.repsPerformed) }
+        (completedSets ?? []).reduce(0) { $0 + $1.weightKg * Double($1.repsPerformed) }
+    }
+
+    public func appendCompletedSet(_ set: CompletedSet) {
+        var existing = completedSets ?? []
+        existing.append(set)
+        completedSets = existing
     }
 }

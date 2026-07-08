@@ -74,7 +74,7 @@ public final class CompletedSet {
 
     /// Per-rep metrics. Cascade delete: removing the set removes its metrics.
     @Relationship(deleteRule: .cascade, inverse: \RepMetric.completedSet)
-    public var repMetrics: [RepMetric] = []
+    public var repMetrics: [RepMetric]?
 
     public init(
         exercise: Exercise?,
@@ -103,6 +103,12 @@ public final class CompletedSet {
 
     /// Per-rep metrics sorted by rep index.
     public var orderedRepMetrics: [RepMetric] {
-        repMetrics.sorted { $0.repIndex < $1.repIndex }
+        (repMetrics ?? []).sorted { $0.repIndex < $1.repIndex }
+    }
+
+    public func appendRepMetric(_ metric: RepMetric) {
+        var existing = repMetrics ?? []
+        existing.append(metric)
+        repMetrics = existing
     }
 }

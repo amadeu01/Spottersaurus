@@ -28,11 +28,11 @@ public final class Exercise {
     /// Planned sets that reference this exercise. Nullify on delete — removing
     /// a planned set must not remove the shared exercise.
     @Relationship(deleteRule: .nullify, inverse: \PlannedSet.exercise)
-    public var plannedSets: [PlannedSet] = []
+    public var plannedSets: [PlannedSet]?
 
     /// Completed sets that reference this exercise. Nullify on delete.
     @Relationship(deleteRule: .nullify, inverse: \CompletedSet.exercise)
-    public var completedSets: [CompletedSet] = []
+    public var completedSets: [CompletedSet]?
 
     public init(name: String, kind: LiftKind, id: UUID = UUID(), createdAt: Date = Date()) {
         self.id = id

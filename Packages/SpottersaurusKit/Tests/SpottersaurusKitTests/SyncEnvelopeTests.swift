@@ -103,6 +103,62 @@ final class SyncEnvelopeTests: XCTestCase {
         XCTAssertEqual(decoded, tick)
     }
 
+    // MARK: PlannedSessionEnvelope
+
+    func testPlannedSessionEnvelopeRoundTrips() throws {
+        let envelope = PlannedSessionEnvelope(
+            programName: "5/3/1",
+            dayName: "Bench Day",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            sets: [
+                PlannedSetEnvelope(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 80, restSeconds: 180),
+                PlannedSetEnvelope(lift: .accessory, exerciseName: "Barbell Row", targetReps: 8, weightKg: 60, restSeconds: 120, sortIndex: 1),
+            ]
+        )
+
+        let decoded = try roundTrip(envelope)
+        XCTAssertEqual(decoded, envelope)
+        XCTAssertEqual(decoded.firstSet?.exerciseName, "Bench Press")
+    }
+
+    func testPlannedSessionEnvelopeFactoryResolvesLoadsAndPreservesSetOrder() {
+        let bench = Exercise(name: "Bench Press", kind: .bench)
+        let row = Exercise(name: "Barbell Row", kind: .accessory)
+        let program = Program(name: "Upper", rule: .custom)
+        let day = ProgramDay(name: "Day 1")
+        let setB = PlannedSet(
+            exercise: row,
+            targetReps: 8,
+            load: .absolute(kg: 62),
+            restSeconds: 120,
+            sortIndex: 1
+        )
+        let setA = PlannedSet(
+            exercise: bench,
+            targetReps: 5,
+            load: .percentOfTrainingMax(percent: 80),
+            isAMRAP: true,
+            restSeconds: 180,
+            sortIndex: 0
+        )
+        day.plannedSets = [setB, setA]
+        program.days = [day]
+        let maxes = [UserMaxes(lift: .bench, trainingMaxKg: 100, oneRepMaxKg: 125)]
+
+        let envelope = PlannedSessionEnvelope.make(
+            program: program,
+            day: day,
+            maxes: maxes,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        XCTAssertEqual(envelope.programName, "Upper")
+        XCTAssertEqual(envelope.dayName, "Day 1")
+        XCTAssertEqual(envelope.sets.map { $0.exerciseName }, ["Bench Press", "Barbell Row"])
+        XCTAssertEqual(envelope.sets.map { $0.weightKg }, [80, 62.5])
+        XCTAssertEqual(envelope.firstSet?.isAMRAP, true)
+    }
+
     // MARK: CompletedSetEnvelope — richer fields
 
     /// The pre-existing scaffold init (no rep metrics / spotter events / e1RM

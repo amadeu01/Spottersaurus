@@ -29,7 +29,7 @@ Legend: `- [ ]` todo · `- [x] … (2026-06-29)` done.
            MetricReadout / PrimaryButton. Full end-to-end apply stays in Phase 10. -->
 - [x] Delete template `Item.swift`; gut default `ContentView` (2026-06-29)
 - [x] Verify: `swift test` (package) green; both app targets build via `xcodebuild` (2026-07-08)
-      <!-- package `swift test` green: 60 XCTest tests + 18 Swift Testing tests.
+      <!-- package `swift test` green: 63 XCTest tests + 18 Swift Testing tests.
            iOS target BUILD SUCCEEDED on iPhone 17 sim. Watch target BUILD
            SUCCEEDED with `generic/platform=watchOS Simulator`. -->
 
@@ -65,7 +65,9 @@ for Xcode / later phases to avoid risking the iOS build):
            iOS `Spottersaurus` scheme: BUILD SUCCEEDED on iPhone 17 sim.
            Ordered relationships use an explicit `sortIndex`/`repIndex` + sorted
            accessors (orderedDays/orderedSets/orderedRepMetrics) — robust and
-           CloudKit-safe, since SwiftData relationship arrays are unordered. -->
+           CloudKit-safe, since SwiftData relationship arrays are unordered.
+           SwiftData relationship arrays are optional to satisfy CloudKit
+           validation; callers use nil-safe ordered accessors/append helpers. -->
 
 
 ## Phase 3 — Detection engine (core risk, hardware-free)
@@ -112,10 +114,11 @@ for Xcode / later phases to avoid risking the iOS build):
 
 ## Phase 5 — Watch UI (native-ported design)
 - [x] Live set screen: rep counter, concentric velocity, weight, HR (monospaced digits) (2026-07-08)
-      <!-- `Spottersaurus Watch App/LiveSetView.swift` replaces the placeholder
+      <!-- `Spottersaurus Watch App/Features/LiveSet` replaces the placeholder
            root with a deterministic live-set surface driven by
-           `SetLifecycleController`. Hardware session wiring still replaces the
-           local demo controls in Phase 4. -->
+           `SetLifecycleController`. App dependencies live in `App/`; small
+           watch renderers live in `Components/`. Hardware session wiring still
+           replaces the local demo controls in Phase 4. -->
 - [x] Concentric `Circle().trim` ring gauge per rep (2026-07-08)
       <!-- Uses shared `RingGauge` with rep/rest progress. -->
 - [x] State tinting: neutral → amber (grinding) → red (RACK IT) with pulsing border (2026-07-08)
@@ -127,8 +130,8 @@ for Xcode / later phases to avoid risking the iOS build):
            remains open until real timer/session wiring exists. -->
 - [ ] Crown-scrub weight/reps; 44pt targets; safe areas
       <!-- Digital Crown adjusts load; buttons use 44pt minimum hit targets.
-           Target reps are local state today and should be driven by planned-set
-           data once Watch session loading exists. -->
+           Target reps now come from the injected `WatchPlannedSet`; real data
+           should arrive through WatchLink once session loading exists. -->
 - [ ] Verify: visual pass on Watch, dark-first OLED
 
 ## Phase 6 — Sync (Watch ↔ iPhone)
@@ -149,15 +152,35 @@ for Xcode / later phases to avoid risking the iOS build):
 - [ ] Verify: standalone Watch session appears in iPhone history + Apple Health
 
 ## Phase 7 — iPhone planner
-- [ ] Today / Start screen; Send-to-Watch; standalone-start fallback
-- [ ] Program builder: days → planned sets (exercise, sets×reps, weight/%1RM, AMRAP, rest)
+- [x] Today / Start screen; Send-to-Watch; standalone-start fallback (2026-07-08)
+      <!-- SwiftData-backed Today tab shows the active program/day and resolved
+           planned-set loads. Send-to-Watch builds a `PlannedSessionEnvelope`
+           and sends it through the iOS `WatchLink` adapter (live message when
+           reachable, queued application context/userInfo otherwise). Watch app
+           consumes the same envelope via `WatchPlannedSessionStore`, persists
+           the last received session, and falls back to a local standalone set
+           when no iPhone handoff exists. -->
+- [x] Program builder: days → planned sets (exercise, sets×reps, weight/%1RM, AMRAP, rest) (2026-07-08)
+      <!-- `Features/Programs/Builder`: draft-based builder can create custom
+           Programs, add/edit/reorder/delete ProgramDays and PlannedSets, choose
+           lift/accessory exercise, reps, absolute or % training-max load,
+           AMRAP, and rest. Saves into SwiftData domain models. -->
 - [x] Progression engine (pure math): 5/3/1 TM + week schemes, linear bump, %1RM→kg resolve (2026-07-08)
       <!-- TDD, hardware-free. Sources/.../Progression/ (core + FiveThreeOne +
            Linear). Rounds to barbell increment (nearest, tie away from zero).
            18 tests. Preset-load + auto-progress UI still to wire. -->
 - [ ] Load 5/3/1 + linear presets; auto-progress weights from `UserMaxes` (wire engine into builder UI)
+      <!-- Partial (2026-07-08): Programs tab can insert the existing 5/3/1 and
+           linear presets, browse days/sets, delete programs, and resolve loads
+           from UserMaxes. Auto-progress after logged sessions remains open. -->
 - [ ] Maxes editor; calibration view/reset
-- [ ] Verify: build a program → loads on Watch
+      <!-- Partial (2026-07-08): Maxes tab creates/edits SBD training max + 1RM
+           records. Calibration profile view/reset remains open. -->
+- [x] Verify: build a program → loads on Watch (2026-07-08)
+      <!-- Hardware-free verification: `PlannedSessionEnvelope.make(program:day:maxes:)`
+           resolves % training-max and absolute loads into ordered Watch-ready
+           sets (2 tests). iOS and Watch simulator builds both succeed. Real
+           phone-to-watch delivery still needs paired-device validation. -->
 
 ## Phase 8 — iPhone review / analytics
 - [ ] History list → session → set detail (per-rep metrics, spotter events, e1RM)

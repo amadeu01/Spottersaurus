@@ -41,12 +41,12 @@ final class PersistenceMappingTests: XCTestCase {
 
         XCTAssertEqual(session.id, envelope.id)
         XCTAssertEqual(session.date, envelope.date)
-        XCTAssertEqual(session.completedSets.count, 1)
+        XCTAssertEqual(session.completedSets?.count, 1)
 
         let fetched = try context.fetch(FetchDescriptor<WorkoutSession>())
         XCTAssertEqual(fetched.count, 1)
 
-        let set = try XCTUnwrap(fetched.first?.completedSets.first)
+        let set = try XCTUnwrap(fetched.first?.completedSets?.first)
         XCTAssertEqual(set.weightKg, 100)
         XCTAssertEqual(set.repsPerformed, 5)
     }
@@ -77,7 +77,7 @@ final class PersistenceMappingTests: XCTestCase {
 
         let session = try SessionImporter.importSession(envelope, into: context)
 
-        let set = try XCTUnwrap(session.completedSets.first)
+        let set = try XCTUnwrap(session.completedSets?.first)
         XCTAssertEqual(set.exercise?.kind, .deadlift)
 
         let ordered = set.orderedRepMetrics
@@ -111,7 +111,7 @@ final class PersistenceMappingTests: XCTestCase {
         )
 
         let session = try SessionImporter.importSession(envelope, into: context)
-        let set = try XCTUnwrap(session.completedSets.first)
+        let set = try XCTUnwrap(session.completedSets?.first)
 
         XCTAssertEqual(set.spotterEvents.count, 2)
         XCTAssertEqual(set.spotterEvents.map(\.stage), [.grind, .rackIt])
@@ -147,7 +147,7 @@ final class PersistenceMappingTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<RepMetric>()), 1)
 
         let sessions = try context.fetch(FetchDescriptor<WorkoutSession>())
-        XCTAssertEqual(sessions.first?.completedSets.first?.weightKg, 140)
+        XCTAssertEqual(sessions.first?.completedSets?.first?.weightKg, 140)
     }
 
     func testReimportingWithChangedContentUpdatesInPlace() throws {
@@ -177,7 +177,7 @@ final class PersistenceMappingTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CompletedSet>()), 2)
 
         let session = try XCTUnwrap(try context.fetch(FetchDescriptor<WorkoutSession>()).first)
-        XCTAssertEqual(session.completedSets.map(\.weightKg).sorted(), [85, 85])
+        XCTAssertEqual((session.completedSets ?? []).map(\.weightKg).sorted(), [85, 85])
     }
 
     // MARK: empty-sets edge case
@@ -188,7 +188,7 @@ final class PersistenceMappingTests: XCTestCase {
         let envelope = SessionEnvelope(date: Date(timeIntervalSince1970: 1_700_000_000), sets: [])
         let session = try SessionImporter.importSession(envelope, into: context)
 
-        XCTAssertEqual(session.completedSets.count, 0)
+        XCTAssertEqual(session.completedSets?.count ?? 0, 0)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutSession>()), 1)
     }
 }

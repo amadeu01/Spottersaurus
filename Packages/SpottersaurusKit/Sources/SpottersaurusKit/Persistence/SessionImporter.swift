@@ -36,7 +36,7 @@ public enum SessionImporter {
             // Upsert by clearing the prior sets (cascade removes their rep
             // metrics too) and rebuilding from the re-delivered envelope, so a
             // retried/duplicate handoff never produces duplicate history.
-            for set in session.completedSets {
+            for set in session.completedSets ?? [] {
                 context.delete(set)
             }
             session.completedSets = []

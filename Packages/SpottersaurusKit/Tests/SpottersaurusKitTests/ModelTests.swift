@@ -19,6 +19,10 @@ final class ModelTests: XCTestCase {
         return (container, ModelContext(container))
     }
 
+    func testCloudKitModelContainerBuilds() throws {
+        _ = try makeModelContainer(cloudKit: true)
+    }
+
     // MARK: insert / fetch round-trip
 
     func testProgramGraphRoundTrips() throws {

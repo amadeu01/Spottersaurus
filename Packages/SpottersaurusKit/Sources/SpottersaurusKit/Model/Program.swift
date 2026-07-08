@@ -47,12 +47,12 @@ public final class Program {
     /// The program's days. Cascade delete: removing the program removes its
     /// days (and, transitively, their planned sets). Read `orderedDays`.
     @Relationship(deleteRule: .cascade, inverse: \ProgramDay.program)
-    public var days: [ProgramDay] = []
+    public var days: [ProgramDay]?
 
     /// Sessions logged against this program. Nullify on delete — deleting a
     /// program must not delete logged history.
     @Relationship(deleteRule: .nullify, inverse: \WorkoutSession.program)
-    public var sessions: [WorkoutSession] = []
+    public var sessions: [WorkoutSession]?
 
     public init(name: String, rule: ProgressionRule, id: UUID = UUID(), createdAt: Date = Date()) {
         self.id = id
@@ -63,7 +63,13 @@ public final class Program {
 
     /// Days sorted by their explicit order index.
     public var orderedDays: [ProgramDay] {
-        days.sorted { $0.sortIndex < $1.sortIndex }
+        (days ?? []).sorted { $0.sortIndex < $1.sortIndex }
+    }
+
+    public func appendDay(_ day: ProgramDay) {
+        var existing = days ?? []
+        existing.append(day)
+        days = existing
     }
 }
 
@@ -112,9 +118,9 @@ public extension Program {
                     restSeconds: 180,
                     sortIndex: setIndex
                 )
-                day.plannedSets.append(set)
+                day.appendPlannedSet(set)
             }
-            program.days.append(day)
+            program.appendDay(day)
         }
         return program
     }
@@ -146,9 +152,9 @@ public extension Program {
                     restSeconds: 180,
                     sortIndex: setIndex
                 )
-                day.plannedSets.append(set)
+                day.appendPlannedSet(set)
             }
-            program.days.append(day)
+            program.appendDay(day)
         }
         return program
     }

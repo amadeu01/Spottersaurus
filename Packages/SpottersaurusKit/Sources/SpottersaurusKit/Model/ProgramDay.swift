@@ -26,7 +26,7 @@ public final class ProgramDay {
     /// Planned sets for this day. Cascade delete: removing the day removes its
     /// sets. Read `orderedSets` for the sorted view.
     @Relationship(deleteRule: .cascade, inverse: \PlannedSet.day)
-    public var plannedSets: [PlannedSet] = []
+    public var plannedSets: [PlannedSet]?
 
     public init(name: String, sortIndex: Int = 0, id: UUID = UUID()) {
         self.id = id
@@ -36,6 +36,12 @@ public final class ProgramDay {
 
     /// Planned sets sorted by their explicit order index.
     public var orderedSets: [PlannedSet] {
-        plannedSets.sorted { $0.sortIndex < $1.sortIndex }
+        (plannedSets ?? []).sorted { $0.sortIndex < $1.sortIndex }
+    }
+
+    public func appendPlannedSet(_ set: PlannedSet) {
+        var existing = plannedSets ?? []
+        existing.append(set)
+        plannedSets = existing
     }
 }
