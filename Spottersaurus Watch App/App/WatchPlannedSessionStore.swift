@@ -1,7 +1,9 @@
 import Foundation
+import Observation
 import WatchConnectivity
 import SpottersaurusKit
 
+@Observable
 final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     static let shared = WatchPlannedSessionStore()
 
@@ -18,6 +20,33 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     private var isLiveTickInFlight = false
     private var liveTickBackoffUntil: Date?
     private let logger = LoggerGroup.watch
+
+    /// Latest `WCSession` state observed on the Watch side, pushed from
+    /// `activationDidCompleteWith` and `sessionReachabilityDidChange`.
+    /// watchOS's `WCSession` doesn't expose `isPaired`/`isWatchAppInstalled`
+    /// (those are iOS-only APIs) — the Watch app only ever exists on the one
+    /// Watch it's running on, paired to the one phone it's provisioned with,
+    /// so both are true by construction whenever the session has activated.
+    /// Reachability + activation state are the only two flags the Watch can
+    /// actually observe, so `connectionStatus` feeds
+    /// `ConnectionStatus.resolve(isPaired: true, isWatchAppInstalled: true,
+    /// ...)` and lets the shared reducer collapse pre-activation to
+    /// `.inactive`, activated-but-unreachable to `.pairedNotReachable`, and
+    /// activated-and-reachable to `.connected`.
+    private(set) var isReachable = false
+    private(set) var activationState = 0
+
+    /// Pure projection of the flags above via the shared `ConnectionStatus`
+    /// reducer (see the doc comment on `isReachable` for the watchOS
+    /// isPaired/isWatchAppInstalled assumption).
+    var connectionStatus: ConnectionStatus {
+        ConnectionStatus.resolve(
+            isPaired: true,
+            isWatchAppInstalled: true,
+            isReachable: isReachable,
+            activationState: activationState
+        )
+    }
 
     override private init() {
         let encoder = JSONEncoder()
@@ -108,6 +137,23 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         error: Error?
     ) {
         logger.info(.watchLink, "Watch WCSession activation state=\(activationState.rawValue) error=\(error?.localizedDescription ?? "none")")
+        updateSessionState(isReachable: session.isReachable, activationState: activationState.rawValue)
+    }
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        logger.info(.watchLink, "Watch WCSession reachability changed reachable=\(session.isReachable)")
+        updateSessionState(isReachable: session.isReachable, activationState: session.activationState.rawValue)
+    }
+
+    /// Pushes a fresh `WCSession` snapshot onto the `@Observable` state so
+    /// `PhoneConnectionChip` updates reactively. Delegate callbacks aren't
+    /// guaranteed to land on the main actor, so hop explicitly (mirrors
+    /// `WatchLink.pushSessionState` on the iPhone side).
+    private func updateSessionState(isReachable: Bool, activationState: Int) {
+        Task { @MainActor in
+            self.isReachable = isReachable
+            self.activationState = activationState
+        }
     }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {

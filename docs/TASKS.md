@@ -182,9 +182,22 @@ Grill decision: WCSession state exists but is only logged; surface it reactively
            same chip in its header instead of the old ad-hoc timestamp/dot,
            wired from both `TodayView` and `ReviewView`. One `#Preview`
            renders all `ConnectionStatus.allCases`. -->
-- [ ] **D3 — Phone-reachability chip on Watch** (Watch UI, `#Preview`)
+- [x] **D3 — Phone-reachability chip on Watch** (Watch UI, `#Preview`) (2026-07-09)
       Mirror a compact reachability chip on the Watch root using
       `WatchPlannedSessionStore` session state. `#Preview` states. Done-when: builds.
+      <!-- `WatchPlannedSessionStore` is now `@Observable`, tracking
+           `isReachable`/`activationState` (updated from
+           `activationDidCompleteWith` + a new `sessionReachabilityDidChange`,
+           hopping to `@MainActor`) and exposing `connectionStatus` via the
+           shared `ConnectionStatus.resolve` reducer with `isPaired: true,
+           isWatchAppInstalled: true` (watchOS can't observe those flags — see
+           doc comment). New `Spottersaurus Watch App/Components/
+           PhoneConnectionChip.swift` mirrors `WatchConnectionChip`'s look
+           ("iPhone connected"/green, "iPhone unreachable"/amber,
+           "Connecting…"/gray) with 4 `#Preview`s. Wired into
+           `LiveSetView` above `LiveSetHeaderView` (only in the non-overlay
+           branch, so it never competes with the RACK IT overlay or metrics
+           grid). -->
 
 ### Block E — Watch real-vs-mocked (#5/#6). Depends on C2.
 Grill decision: real motion/HR pipeline is primary; move manual +rep/flag behind a

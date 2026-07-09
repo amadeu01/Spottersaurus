@@ -12,6 +12,7 @@ struct LiveSetView: View {
     @State private var crownMode: LiveSetCrownMode
     @State private var crownValue: Double
     @State private var handledCommandID: UUID?
+    @State private var sessionStore = WatchPlannedSessionStore.shared
     @FocusState private var crownFocused: Bool
 
     init(plannedSet: PlannedSetEnvelope) {
@@ -32,6 +33,7 @@ struct LiveSetView: View {
             } else {
                 ScrollView {
                     VStack(spacing: Theme.Spacing.sm) {
+                        PhoneConnectionChip(status: sessionStore.connectionStatus)
                         LiveSetHeaderView(
                             exerciseName: viewModel.exerciseName,
                             statusText: viewModel.statusText,
