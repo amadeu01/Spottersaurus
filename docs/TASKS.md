@@ -29,25 +29,25 @@ Legend: `- [ ]` todo · `- [x] … (2026-06-29)` done.
 Grill decision: keep the `AppLogger`/`LoggerGroup` sink abstraction; add a filterable
 Xcode-console sink **and** an exportable NDJSON file sink so an LLM can read logs.
 
-- [ ] **A1 — `ConsoleLogSink`** (pure, TDD)
+- [x] **A1 — `ConsoleLogSink`** (pure, TDD) (2026-07-09)
       New `Diagnostics/ConsoleLogSink.swift` in `SpottersaurusKit`. Conforms to
       `AppLogger`; formats `"[\(level)][\(category)] \(message)"` and prints to
       stdout so Xcode's console filter box matches on `[motion]` etc. Test: inject a
       capture closure (make the print target injectable) and assert the formatted
       line for each level/category. Done-when: unit test green, sink formats exactly.
-- [ ] **A2 — `FileLogSink` NDJSON ring buffer** (actor, TDD)
+- [x] **A2 — `FileLogSink` NDJSON ring buffer** (actor, TDD) (2026-07-09)
       New `Diagnostics/FileLogSink.swift`. Sendable `actor` appending one JSON object
       per line (`ts` ISO8601, `level`, `category`, `target`, `message`) to a file in
       the shared App Group container (`group.amadeu.dev.Spottersaurus`). Ring-cap by
       byte size (rotate/truncate oldest). Expose async `exportURL()` / `readAll()`.
       Test against a temp dir: append N lines → assert NDJSON parses, cap trims oldest,
       concurrent appends don't interleave. Done-when: tests green.
-- [ ] **A3 — Wire sinks into `LoggerGroup`** (TDD-light)
+- [x] **A3 — Wire sinks into `LoggerGroup`** (TDD-light) (2026-07-09)
       Extend `LoggerGroup.iPhone` / `.watch` to fan out to `OSLogLogger` +
       `ConsoleLogSink` + `FileLogSink` (shared file path per target, `target` field =
       `"iphone"`/`"watch"`). Test: a `LoggerGroup` with spy sinks forwards to all.
       Done-when: both targets build, existing log calls now hit all three sinks.
-- [ ] **A4 — In-app log viewer + export** (iPhone UI, `#Preview`)
+- [x] **A4 — In-app log viewer + export** (iPhone UI, `#Preview`) (2026-07-09)
       New debug screen (reachable from a Settings/Debug entry) listing recent NDJSON
       lines with a category filter, plus a `ShareLink`/share sheet exporting the log
       file. `#Preview` with seeded lines. Done-when: builds, preview renders, export
