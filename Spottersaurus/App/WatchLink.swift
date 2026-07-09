@@ -35,6 +35,24 @@ final class WatchLink: NSObject, WCSessionDelegate {
         logger.info(.watchLink, "activated iPhone WCSession supported=\(session != nil)")
     }
 
+    /// Re-triggers `WCSession` activation — the phone-side half of a
+    /// "Reconnect" affordance (Phase 0.2 R3's `WatchReconnectCard`). Safe to
+    /// call on an already-activated session: the OS simply re-runs
+    /// `activationDidCompleteWith` with the current state, which re-pushes
+    /// fresh flags into `PhoneWatchSessionMonitor`. This is a genuine retry
+    /// (re-kicks the transport), not a fake button — the phone cannot force
+    /// Watch reachability, pairing, or app installation from here; the
+    /// caller pairs this with an "open Spottersaurus on your Watch" hint.
+    @MainActor
+    func reactivate() {
+        guard let session else {
+            logger.warning(.watchLink, "reconnect requested but WCSession unsupported")
+            return
+        }
+        logger.info(.watchLink, "reconnect requested; reactivating WCSession")
+        session.activate()
+    }
+
     @MainActor
     func send(command: WatchCommandEnvelope) async -> WatchCommandSendStatus {
         guard let session, session.isReachable else {

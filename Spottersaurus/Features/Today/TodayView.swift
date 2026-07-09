@@ -3,16 +3,12 @@ import SwiftUI
 import SpottersaurusKit
 
 struct TodayView: View {
-    /// How recent `lastTickReceivedAt` must be for a Watch session to be
-    /// considered "live". Chosen to comfortably span the gap between ticks
-    /// during an active set while disappearing quickly once they stop.
-    static let liveSessionWindow: TimeInterval = 10
-
     @Environment(\.plannerDependencies) private var dependencies
     @Query private var programs: [Program]
     @Query private var maxes: [UserMaxes]
     @State private var viewModel = TodayViewModel()
     @State private var watchMonitor = PhoneWatchSessionMonitor.shared
+    @State private var liveSessionMonitor = LiveSessionMonitor.shared
 
     var body: some View {
         NavigationStack {
@@ -21,17 +17,13 @@ struct TodayView: View {
                     header
                     WatchConnectionChip(status: watchMonitor.connectionStatus)
 
-                    // `TimelineView` ticks once a second purely so `isLiveSessionActive`
-                    // re-evaluates and the card disappears shortly after ticks stop,
-                    // even with no new data arriving from the Watch.
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        if isLiveSessionActive(at: context.date) {
-                            LiveWatchStatusCardView(
-                                tick: watchMonitor.lastTick,
-                                receivedAt: watchMonitor.lastTickReceivedAt,
-                                importMessage: watchMonitor.lastImportMessage,
-                                connectionStatus: watchMonitor.connectionStatus
-                            )
+                    // Live metrics moved to S1's app-wide In-Workout takeover
+                    // (`InWorkoutView`); this compact card only ever surfaces
+                    // the idle/disconnected case with a reconnect affordance,
+                    // so it never competes with that takeover.
+                    if showsReconnectCard {
+                        WatchReconnectCard(status: watchMonitor.connectionStatus) {
+                            WatchLink.shared.reactivate()
                         }
                     }
 
@@ -91,13 +83,17 @@ struct TodayView: View {
         }
     }
 
-    /// A Watch session is "live" when a tick has arrived and it's recent
-    /// enough that a set is plausibly still in progress.
-    private func isLiveSessionActive(at now: Date) -> Bool {
-        guard watchMonitor.lastTick != nil, let receivedAt = watchMonitor.lastTickReceivedAt else {
-            return false
+    /// The reconnect card only ever surfaces the idle/disconnected case: it
+    /// hides while a Live Session is active/armed/resting (S1's app-wide
+    /// `InWorkoutView` owns that surface) and while the Watch is already
+    /// `.connected` (the header chip already covers that calmly, without a
+    /// second card restating it).
+    private var showsReconnectCard: Bool {
+        guard watchMonitor.connectionStatus != .connected else { return false }
+        switch liveSessionMonitor.state.phase {
+        case .idle, .ended: return true
+        case .armed, .active, .resting: return false
         }
-        return now.timeIntervalSince(receivedAt) <= Self.liveSessionWindow
     }
 
     private var header: some View {
@@ -121,20 +117,33 @@ struct TodayView: View {
         .modelContainer(try! makeModelContainer(inMemory: true, cloudKit: false))
 }
 
-#Preview("Watch session live") {
-    let monitor = PhoneWatchSessionMonitor.shared
-    monitor.lastTick = LiveTickEnvelope(repCount: 4, currentVelocityMS: 0.38, heartRateBPM: 138, elapsedSeconds: 24)
-    monitor.lastTickReceivedAt = .now
-    monitor.lastImportMessage = "Last import: Bench Press · 5 reps"
+#Preview("Watch unreachable — reconnect card") {
+    // No Live Session in progress, Watch paired/installed but unreachable ->
+    // the reconnect card should render with its retry button.
+    PhoneWatchSessionMonitor.shared.updateSessionState(
+        isPaired: true,
+        isWatchAppInstalled: true,
+        isReachable: false,
+        activationState: ConnectionStatus.activatedRawValue
+    )
 
     return TodayView()
         .modelContainer(PreviewSeed.seededContainer())
 }
 
-#Preview("Watch session idle") {
-    let monitor = PhoneWatchSessionMonitor.shared
-    monitor.lastTick = nil
-    monitor.lastTickReceivedAt = nil
+#Preview("Live session active — reconnect card hidden") {
+    // NOTE: both monitors are process-wide singletons (same caveat as
+    // sibling previews in this file/`ContentView`) — seeded via their public
+    // reducer entry points. Even though the Watch reports unreachable here,
+    // an active Live Session hides the reconnect card so it never competes
+    // with S1's `InWorkoutView` takeover.
+    PhoneWatchSessionMonitor.shared.updateSessionState(
+        isPaired: true,
+        isWatchAppInstalled: true,
+        isReachable: false,
+        activationState: ConnectionStatus.activatedRawValue
+    )
+    LiveSessionMonitor.shared.receive(lifecycle: .armed(lift: .bench, targetReps: 5, weightKg: 100, setIndex: 1, setCount: 4))
 
     return TodayView()
         .modelContainer(PreviewSeed.seededContainer())
