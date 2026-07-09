@@ -12,6 +12,7 @@ public enum AppLogLevel: Sendable, Equatable {
 
 public enum AppLogCategory: String, Sendable, Equatable {
     case calibration
+    case health
     case liveSet
     case motion
     case persistence

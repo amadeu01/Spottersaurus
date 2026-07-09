@@ -516,13 +516,23 @@ in parallel with the rest. Review each subagent commit before dispatching depend
            Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
 
 ### Block H — Apple Health import (iPhone). Depends on nothing; H2 after H1.
-- [ ] **H1 — iPhone `HealthKitAuthorizing` impl** (TDD via package fake)
+- [x] **H1 — iPhone `HealthKitAuthorizing` impl** (TDD via package fake) (2026-07-09)
       Add an iOS-target concrete `HealthKitAuthorizing` (the protocol is already in
       `SpottersaurusKit`; the Watch has its own impl). Request read: `workout`,
       `bodyMass`, `heartRate`. Reuse the package `HealthAuthorizationStatus`. Gate
       ask-once (UserDefaults) like the Watch impl. Log under a NEW `.health`
       category (add `health` to `AppLogCategory`). Test the gate/ask-once via the
       existing package `FakeHealthKitAuthorizer` pattern. Done-when: tests green, iOS builds.
+      <!-- Added `health` to `AppLogCategory` (package). New
+           `Spottersaurus/Features/Health/PhoneHealthKitAuthorizer.swift`: actor
+           conforming to `HealthKitAuthorizing`, read-only (workout, bodyMass,
+           heartRate), ask-once gate via a distinct UserDefaults key
+           (`PhoneHealthKitAuthorizer.hasRequestedAuthorization`), logs outcome
+           under `.health` via `LoggerGroup.iPhone`. Not wired into any view
+           (H3/P1 do that). `swift test`: 85 XCTests + 35 Swift Testing tests
+           green. `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
+           Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. `-only-testing:
+           SpottersaurusTests`: TEST SUCCEEDED (19 cases). -->
 - [ ] **H2 — `HealthImporter` (read HKWorkout + bodyMass → app models)** (TDD pure mapping)
       A service that queries recent `HKWorkout` (functionalStrengthTraining only) +
       most-recent `bodyMass` and maps them into app models. Split PURE mapping

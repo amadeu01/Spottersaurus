@@ -74,6 +74,19 @@ final class AppLoggerTests: XCTestCase {
         }
     }
 
+    func testHealthCategoryRoundTripsItsRawValueAndFansOutLikeAnyOtherCategory() {
+        XCTAssertEqual(AppLogCategory(rawValue: "health"), .health)
+        XCTAssertEqual(AppLogCategory.health.rawValue, "health")
+
+        let spy = SpyLogger()
+        let group = LoggerGroup([spy])
+
+        group.info(.health, "authorization requested")
+
+        XCTAssertEqual(spy.calls.count, 1)
+        XCTAssertEqual(spy.calls.first?.category, .health)
+    }
+
     func testSpottersaurusLogFileURLFallsBackToTemporaryDirectoryWhenNoAppGroup() {
         // In the SwiftPM test bundle there is no App Group entitlement, so the
         // helper must fall back to a writable temp directory rather than nil.
