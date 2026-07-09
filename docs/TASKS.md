@@ -74,10 +74,16 @@ non-dismissable "Data is NOT being saved" banner. Local fallback logs but runs n
            `StoreTierTests.swift` (3 tests) covers cloudKit success, cloudKit→
            local fallback, and cloudKit+local→inMemory fallback via a spy
            logger. -->
-- [ ] **B2 — inMemory warning banner** (iPhone UI, `#Preview`)
+- [x] **B2 — inMemory warning banner** (iPhone UI, `#Preview`) (2026-07-09)
       When `StoreTier == .inMemory`, overlay a persistent, non-dismissable banner
       ("Data is NOT being saved — storage unavailable"). `#Preview` both states.
       Done-when: builds, preview shows banner only for inMemory.
+      <!-- New `Features/Debug/StoreHealthBanner.swift`: renders nothing for
+           `.cloudKit`/`.local`, an alert-tinted, non-dismissable top banner for
+           `.inMemory`. `ContentView` now takes `storeTier: StoreTier` (defaulted
+           to `.local`) and overlays the banner via `.overlay(alignment: .top)`;
+           `SpottersaurusApp` passes its resolved `storeTier` through. Two
+           `#Preview`s cover both states. -->
 
 ### Block C — HealthKit authorization (#3/#4). The core sync bug.
 Grill decision: Watch requests `read: heartRate`, `share: workout (+ activeEnergy)`

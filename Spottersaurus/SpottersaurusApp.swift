@@ -30,7 +30,7 @@ struct SpottersaurusApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(storeTier: storeTier)
         }
         .modelContainer(modelContainer)
     }
