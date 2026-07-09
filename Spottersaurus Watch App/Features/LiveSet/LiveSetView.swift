@@ -19,6 +19,14 @@ struct LiveSetView: View {
     /// visibly go stale, not freeze on its last good value).
     @State private var telemetryNow = Date()
     @FocusState private var crownFocused: Bool
+    /// AOD calm variant (Phase 0.2 V1): the Watch runs inside an
+    /// `HKWorkoutSession` during a set, so it stays frontmost and gets an
+    /// Always-On Display when the wrist lowers — this must be a calm, static
+    /// surface (no pulsing, no fast-churning decimals) for burn-in/battery.
+    /// Gates presentation only; the RACK IT haptic/audio alarm path
+    /// (`SetLifecycleController` / `WatchLiveSetFeedback`) is untouched and
+    /// fires regardless of luminance.
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     /// This set's zero-based position and the day's total set count — the
     /// "N"/"M" in "Set N of M" (Phase 0.2 M1b). `WatchRootView` recreates
@@ -79,7 +87,10 @@ struct LiveSetView: View {
                             alertStage: viewModel.alertStage
                         )
                         HRAuthIndicatorView(status: viewModel.hrAuthStatus)
-                        if viewModel.state == .armed || viewModel.state == .repping {
+                        if !isLuminanceReduced, viewModel.state == .armed || viewModel.state == .repping {
+                            // Hidden entirely on the Always-On Display: it's a
+                            // dev/liveness micro-readout (sample rate + sample
+                            // age) that would otherwise churn every second.
                             PipelineTelemetryView(
                                 telemetry: viewModel.telemetry(sensorRunning: sessionCoordinator.isMotionRunning, now: telemetryNow)
                             )
@@ -271,6 +282,50 @@ struct LiveSetView: View {
     }
 }
 
+#if DEBUG
+/// Preview-only progression states so `#Preview`s can show `LiveSetView`
+/// already mid-set (armed/repping/grinding/RACK IT) without live sensor
+/// input — needed to demonstrate the AOD calm variant (Phase 0.2 V1) beyond
+/// the idle/pre-arm screen.
+enum PreviewLiveSetState {
+    case armed
+    case repping(completedReps: Int)
+    case grinding
+    case rackIt
+}
+
+extension LiveSetView {
+    init(
+        plannedSet: PlannedSetEnvelope,
+        previewState: PreviewLiveSetState,
+        setIndex: Int = 0,
+        setCount: Int = 1
+    ) {
+        let model = LiveSetViewModel(plannedSet: plannedSet, setIndex: setIndex, setCount: setCount)
+        model.arm()
+        switch previewState {
+        case .armed:
+            break
+        case .repping(let completedReps):
+            for _ in 0..<completedReps { model.completeRep() }
+        case .grinding:
+            model.completeRep()
+            model.flagGrinding()
+        case .rackIt:
+            model.completeRep()
+            model.rackIt()
+        }
+        _viewModel = State(initialValue: model)
+        _crownMode = State(initialValue: .load)
+        _crownValue = State(initialValue: plannedSet.weightKg)
+        self.setIndex = setIndex
+        self.setCount = setCount
+        self.nextSet = nil
+        self.onSetSessionComplete = {}
+    }
+}
+#endif
+
 private extension View {
     @ViewBuilder
     func liveSetCrownRotation(
@@ -297,6 +352,51 @@ private extension View {
     }
 }
 
-#Preview {
+#Preview("Idle") {
     LiveSetView(plannedSet: .init(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 100, restSeconds: 90))
+}
+
+#Preview("Repping") {
+    LiveSetView(
+        plannedSet: .init(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 100, restSeconds: 90),
+        previewState: .repping(completedReps: 2)
+    )
+}
+
+#Preview("AOD — Repping") {
+    LiveSetView(
+        plannedSet: .init(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 100, restSeconds: 90),
+        previewState: .repping(completedReps: 2)
+    )
+    .environment(\.isLuminanceReduced, true)
+}
+
+#Preview("Grinding") {
+    LiveSetView(
+        plannedSet: .init(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 100, restSeconds: 90),
+        previewState: .grinding
+    )
+}
+
+#Preview("AOD — Grinding") {
+    LiveSetView(
+        plannedSet: .init(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 100, restSeconds: 90),
+        previewState: .grinding
+    )
+    .environment(\.isLuminanceReduced, true)
+}
+
+#Preview("Rack It") {
+    LiveSetView(
+        plannedSet: .init(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 100, restSeconds: 90),
+        previewState: .rackIt
+    )
+}
+
+#Preview("AOD — Rack It") {
+    LiveSetView(
+        plannedSet: .init(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 100, restSeconds: 90),
+        previewState: .rackIt
+    )
+    .environment(\.isLuminanceReduced, true)
 }
