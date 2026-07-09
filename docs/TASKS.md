@@ -464,6 +464,93 @@ in parallel with the rest. Review each subagent commit before dispatching depend
 
 ---
 
+## Phase 0.1 — UX & Health Integration
+
+> Inserted 2026-07-09, after Phase 0. Origin: user wants the Review tab cleaned up,
+> a working (real) pull-to-refresh, an iPhone-side Apple Health sync, and a Profile
+> tab; plus a Watch-embed fix surfaced by live logs (`isWatchAppInstalled=false`).
+>
+> **Execution rules** (same as Phase 0): one Sonnet 5 subagent per task, TDD where
+> logic is pure (`/tdd`), `#Preview` + build-green for UI-only tasks, one task = one
+> commit, orchestrator reviews each commit before dispatching dependents. Keep
+> package `swift test` + both target builds green.
+>
+> **Grill decisions (2026-07-09):** live-tick card → Today (session-active only) ·
+> Apple Health = authorize + **import** (read-only: body weight + recent
+> functional-strength workouts; no writes back this round) · Profile tab **absorbs**
+> the Maxes tab · pull-to-refresh does real async work (CloudKit remote fetch +
+> Health import).
+
+### Block W — Watch embed (unblocks all Watch↔iPhone). DONE.
+- [x] **W1 — Embed Watch app into iOS app** (2026-07-09)
+      <!-- iOS app target had no "Embed Watch Content" copy-files phase, so the
+           companion never installed (isWatchAppInstalled=false → all iPhone→Watch
+           sends failed). Added the phase + target dependency (manual Xcode), then
+           normalized via the xcodeproj gem: CodeSignOnCopy + buildActionMask
+           2147483647. Verified Spottersaurus.app/Watch/ contains the watch app
+           after a plain iOS build. Commit e8c0e54. On-device: install by running
+           the iPhone scheme (not the Watch scheme). -->
+
+### Block R — Move the live-tick card off Review
+- [ ] **R1 — Remove `LiveWatchStatusCardView` from `ReviewView`** (iOS UI)
+      Review becomes just the History/Analytics segmented picker. Drop the card +
+      the now-unused `watchMonitor` wiring in `ReviewView` if nothing else needs it.
+      Keep the `#Preview`. Done-when: builds, Review shows no live card.
+- [ ] **R2 — Show live-tick card on `TodayView`, session-active only** (iOS UI, `#Preview`)
+      Render `LiveWatchStatusCardView` on Today ONLY while a Watch session is active
+      — gate on `PhoneWatchSessionMonitor.shared.lastTick` recency (e.g. a tick within
+      the last N seconds) so it appears mid-set and hides when idle. `#Preview` both
+      states (active tick vs none). Done-when: builds, card shows only with a recent tick.
+
+### Block H — Apple Health import (iPhone). Depends on nothing; H2 after H1.
+- [ ] **H1 — iPhone `HealthKitAuthorizing` impl** (TDD via package fake)
+      Add an iOS-target concrete `HealthKitAuthorizing` (the protocol is already in
+      `SpottersaurusKit`; the Watch has its own impl). Request read: `workout`,
+      `bodyMass`, `heartRate`. Reuse the package `HealthAuthorizationStatus`. Gate
+      ask-once (UserDefaults) like the Watch impl. Log under a NEW `.health`
+      category (add `health` to `AppLogCategory`). Test the gate/ask-once via the
+      existing package `FakeHealthKitAuthorizer` pattern. Done-when: tests green, iOS builds.
+- [ ] **H2 — `HealthImporter` (read HKWorkout + bodyMass → app models)** (TDD pure mapping)
+      A service that queries recent `HKWorkout` (functionalStrengthTraining only) +
+      most-recent `bodyMass` and maps them into app models. Split PURE mapping
+      (HK-neutral value structs → domain models / dedupe by date+id) from the HK
+      query (wrap the query behind a small protocol so the mapping is unit-tested
+      without HealthKit). TDD the mapping in `SpottersaurusTests` or package. Idempotent
+      (re-import doesn't duplicate). Done-when: mapping tests green, iOS builds.
+- [ ] **H3 — Health sync service (`lastSyncedAt` + status)** (TDD-light)
+      An `@Observable @MainActor` service tying H1 (auth) + H2 (import): `sync()` async
+      that authorizes, imports, persists, stamps `lastSyncedAt`, exposes a status
+      (`idle`/`syncing`/`synced(date)`/`failed`). Log each step under `.health`. Test
+      the status state machine with fakes. Done-when: tests green, iOS builds.
+
+### Block P — Profile tab (absorbs Maxes). Depends on H3.
+- [ ] **P1 — `ProfileView`** (iOS UI, `#Preview`)
+      New screen with sections: body info (body weight + units), the existing Maxes
+      editor content (reuse `MaxesView`'s body/sections — extract if needed), a
+      "Sync with Apple Health" button wired to the H3 service (shows status +
+      last-synced time), and the Debug Logs entry (MOVED here from Maxes). `#Preview`
+      with seeded data + each sync status. Done-when: builds, previews render, button
+      triggers sync.
+- [ ] **P2 — Swap Maxes tab → Profile tab** (iOS UI)
+      `PlannerTabsView`: replace the Maxes tab with a Profile tab (person icon:
+      `person.crop.circle`). Ensure `ensureCompetitionMaxesExist` still runs (move the
+      call if it lived in Maxes/Profile). Tabs become Today · Programs · Review ·
+      Profile. Done-when: builds, 4 tabs, Maxes content reachable inside Profile.
+
+### Block X — Real pull-to-refresh
+- [ ] **X1 — Async `.refreshable` (CloudKit fetch + Health import)** (iOS UI)
+      Re-add `.refreshable` to History (and/or the Review container) as a REAL async
+      closure that awaits: (a) a CloudKit remote-change fetch/nudge and (b) the H3
+      Health sync. Genuine work → honest spinner + smooth animation. NOT the old
+      synchronous no-op. Done-when: builds, pull-to-refresh runs real async work with
+      a smooth spinner. Depends on H3.
+
+### Phase 0.1 — dependency order for dispatch
+`W1` (done) · `R1`, `R2` independent · `H1 → H2 → H3` · `P1 → P2` after `H3` ·
+`X1` after `H3`. Review each subagent commit before dispatching dependents.
+
+---
+
 ## Phase 1 — Project setup
 - [x] Create `Packages/SpottersaurusKit` local Swift package (Package.swift, iOS+watchOS platforms) (2026-06-29)
 - [x] Package source dirs: `Model/`, `Detection/`, `Sync/`, `Design/`, plus `Tests/` (2026-06-29)
