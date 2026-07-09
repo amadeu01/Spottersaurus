@@ -84,5 +84,19 @@ enum PreviewSeed {
         insertStandardSeed(into: container.mainContext)
         return container
     }
+
+    /// A single imported body weight, as `HealthSyncPersister` would upsert it.
+    static func bodyWeightEntry(date: Date = .now, kilograms: Double = 82.5) -> BodyWeightEntry {
+        BodyWeightEntry(date: date, kilograms: kilograms)
+    }
+
+    /// `insertStandardSeed` plus a `bodyWeightEntry()` — the common case for
+    /// Profile (P1) previews that render both the Maxes editor and body info.
+    static func profileSeededContainer() -> ModelContainer {
+        let container = try! makeModelContainer(inMemory: true, cloudKit: false)
+        insertStandardSeed(into: container.mainContext)
+        container.mainContext.insert(bodyWeightEntry())
+        return container
+    }
 }
 #endif
