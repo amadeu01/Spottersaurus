@@ -109,26 +109,27 @@ public func spottersaurusLogFileURL() -> URL {
     return FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
 }
 
-public extension LoggerGroup {
-    static var iPhone: LoggerGroup {
-        LoggerGroup([
-            OSLogLogger(subsystem: "amadeu.dev.Spottersaurus"),
-            ConsoleLogSink(),
-            FileLogSink(
-                store: FileLogStore(fileURL: spottersaurusLogFileURL(), maxBytes: spottersaurusLogFileMaxBytes),
-                target: "iphone"
-            )
-        ])
-    }
+/// The single process-wide `FileLogStore`. All `FileLogSink`s share this one
+/// actor instance so appends and size-cap trimming (which rewrites the whole
+/// file atomically) are serialized on a single actor — building a fresh store
+/// per log call would let concurrent trims clobber each other's writes. Each
+/// running process (iPhone app / Watch app) resolves its own on-disk file, so
+/// there is no cross-process contention on it.
+let spottersaurusSharedLogStore = FileLogStore(
+    fileURL: spottersaurusLogFileURL(),
+    maxBytes: spottersaurusLogFileMaxBytes
+)
 
-    static var watch: LoggerGroup {
-        LoggerGroup([
-            OSLogLogger(subsystem: "amadeu.dev.Spottersaurus.watchkitapp"),
-            ConsoleLogSink(),
-            FileLogSink(
-                store: FileLogStore(fileURL: spottersaurusLogFileURL(), maxBytes: spottersaurusLogFileMaxBytes),
-                target: "watch"
-            )
-        ])
-    }
+public extension LoggerGroup {
+    static let iPhone = LoggerGroup([
+        OSLogLogger(subsystem: "amadeu.dev.Spottersaurus"),
+        ConsoleLogSink(),
+        FileLogSink(store: spottersaurusSharedLogStore, target: "iphone")
+    ])
+
+    static let watch = LoggerGroup([
+        OSLogLogger(subsystem: "amadeu.dev.Spottersaurus.watchkitapp"),
+        ConsoleLogSink(),
+        FileLogSink(store: spottersaurusSharedLogStore, target: "watch")
+    ])
 }
