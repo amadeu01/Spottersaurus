@@ -75,3 +75,64 @@ public func makeModelContainer(inMemory: Bool = false, cloudKit: Bool = true) th
 
     return try ModelContainer(for: schema, configurations: [configuration])
 }
+
+/// Which storage tier the app is actually persisting to. Ordered by
+/// preference: `.cloudKit` (mirrored, syncs across devices), `.local`
+/// (on-disk, this device only), `.inMemory` (lost on relaunch — a red flag
+/// that should surface in the UI, see Phase 0 Block B).
+public enum StoreTier: String, Sendable, Equatable {
+    case cloudKit
+    case local
+    case inMemory
+}
+
+/// Runs the same cloudKit → local → inMemory fallback ladder
+/// `SpottersaurusApp.makeContainer()` has always used, but as a pure,
+/// injectable function so it's testable without real CloudKit: the caller
+/// hands in the container factory (production passes `makeModelContainer`;
+/// tests pass a fake that fails on demand) and a logger. Every fallback
+/// (including the failure that triggered it) is logged under `.persistence`,
+/// and the winning tier is both logged and returned alongside the container
+/// so callers (e.g. the app's `@main` struct) can surface it in the UI.
+///
+/// - Parameters:
+///   - makeContainer: builds a container for the given `(inMemory, cloudKit)`
+///     flags, matching `makeModelContainer(inMemory:cloudKit:)`'s signature.
+///     Injected so tests can force failures deterministically.
+///   - logger: destination for the `.persistence` tier/fallback log lines.
+/// - Returns: the resolved container plus which tier produced it.
+/// - Note: if even the `inMemory` attempt throws, this `fatalError`s exactly
+///   like the previous `SpottersaurusApp.makeContainer()` did — there is no
+///   lower tier to fall back to and the app cannot launch without *some*
+///   container. Callers should ensure their `inMemory` factory branch cannot
+///   fail (as `makeModelContainer(inMemory: true, cloudKit: false)` doesn't
+///   in practice), which is exactly what the test suite's fakes do, so this
+///   path is intentionally never exercised in tests.
+public func resolveModelContainer(
+    makeContainer: (_ inMemory: Bool, _ cloudKit: Bool) throws -> ModelContainer,
+    logger: any AppLogger
+) throws -> (container: ModelContainer, tier: StoreTier) {
+    do {
+        let container = try makeContainer(false, true)
+        logger.notice(.persistence, "Store tier resolved: cloudKit")
+        return (container, .cloudKit)
+    } catch {
+        logger.error(.persistence, "cloudKit store failed, falling back to local: \(error)")
+    }
+
+    do {
+        let container = try makeContainer(false, false)
+        logger.notice(.persistence, "Store tier resolved: local")
+        return (container, .local)
+    } catch {
+        logger.error(.persistence, "local store failed, falling back to inMemory: \(error)")
+    }
+
+    do {
+        let container = try makeContainer(true, false)
+        logger.notice(.persistence, "Store tier resolved: inMemory (data will NOT be saved)")
+        return (container, .inMemory)
+    } catch {
+        fatalError("Failed to build any ModelContainer: \(error)")
+    }
+}

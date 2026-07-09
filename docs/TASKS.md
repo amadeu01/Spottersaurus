@@ -57,13 +57,23 @@ Xcode-console sink **and** an exportable NDJSON file sink so an LLM can read log
 Grill decision: log the winning store tier; if it lands **inMemory**, show a
 non-dismissable "Data is NOT being saved" banner. Local fallback logs but runs normal.
 
-- [ ] **B1 — Store tier is observable + logged** (TDD)
+- [x] **B1 — Store tier is observable + logged** (TDD) (2026-07-09)
       Refactor `SpottersaurusApp.makeContainer()` to return the container **and** a
       `StoreTier` (`.cloudKit`/`.local`/`.inMemory`); log the winner under
       `.persistence`. Put `StoreTier` + the selection logic in `SpottersaurusKit`
       (pure, injectable failing-factory) so it's testable without real CloudKit.
       Test: forced cloudKit failure → `.local`; both fail → `.inMemory`, each logged.
       Done-when: tests green, app compiles with the new return shape.
+      <!-- Added `StoreTier` + `resolveModelContainer(makeContainer:logger:)` in
+           `SpottersaurusSchema.swift` (SpottersaurusKit): runs the same
+           cloudKit → local → inMemory ladder with an injected factory closure,
+           logs the winning tier + each caught fallback error under
+           `.persistence`, returns `(container, tier)`. `SpottersaurusApp` now
+           calls it with the real `makeModelContainer` + `LoggerGroup.iPhone`
+           and stores `let storeTier: StoreTier` for B2. New
+           `StoreTierTests.swift` (3 tests) covers cloudKit success, cloudKit→
+           local fallback, and cloudKit+local→inMemory fallback via a spy
+           logger. -->
 - [ ] **B2 — inMemory warning banner** (iPhone UI, `#Preview`)
       When `StoreTier == .inMemory`, overlay a persistent, non-dismissable banner
       ("Data is NOT being saved — storage unavailable"). `#Preview` both states.

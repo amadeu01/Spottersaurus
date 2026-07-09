@@ -17,8 +17,15 @@ struct SpottersaurusApp: App {
     /// we fall back to a local-only store rather than crashing.
     let modelContainer: ModelContainer
 
+    /// Which storage tier `modelContainer` actually resolved to. Read by the
+    /// UI (Phase 0 Block B2) to show a non-dismissable "not saving" banner
+    /// when this is `.inMemory`.
+    let storeTier: StoreTier
+
     init() {
-        modelContainer = Self.makeContainer()
+        let resolved = Self.makeContainer()
+        modelContainer = resolved.container
+        storeTier = resolved.tier
     }
 
     var body: some Scene {
@@ -29,21 +36,16 @@ struct SpottersaurusApp: App {
     }
 
     /// Build the CloudKit-mirrored container, degrading to a local store and
-    /// finally to an in-memory store so the app always comes up.
-    private static func makeContainer() -> ModelContainer {
-        do {
-            return try makeModelContainer(cloudKit: true)
-        } catch {
-            // CloudKit unavailable (no entitlement / not signed in) — local store.
-            if let local = try? makeModelContainer(cloudKit: false) {
-                return local
-            }
-            // Last resort: never block app launch on persistence.
-            do {
-                return try makeModelContainer(inMemory: true, cloudKit: false)
-            } catch {
-                fatalError("Failed to build any ModelContainer: \(error)")
-            }
-        }
+    /// finally to an in-memory store so the app always comes up. The
+    /// cloudKit → local → inMemory ladder itself lives in `SpottersaurusKit`
+    /// as `resolveModelContainer` so it's testable without real CloudKit;
+    /// this just supplies the real factory + the shared iPhone logger.
+    private static func makeContainer() -> (container: ModelContainer, tier: StoreTier) {
+        try! resolveModelContainer(
+            makeContainer: { inMemory, cloudKit in
+                try makeModelContainer(inMemory: inMemory, cloudKit: cloudKit)
+            },
+            logger: LoggerGroup.iPhone
+        )
     }
 }
