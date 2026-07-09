@@ -284,9 +284,37 @@ no-op `.refreshable`. Add `#Preview` everywhere.
            Testing, 0 failures (unaffected — History lives in the app target).
            `xcodebuild -scheme Spottersaurus -destination 'platform=iOS Simulator,
            name=iPhone 17' build`: BUILD SUCCEEDED. -->
-- [ ] **F2 — `AnalyticsViewModel` → @Observable hybrid** (TDD)
+- [x] **F2 — `AnalyticsViewModel` → @Observable hybrid** (TDD) (2026-07-09)
       Same pattern; fold the throwaway `HistoryViewModel()` usage out. Test the
       derived analytics inputs. Done-when: test green, charts still render.
+      <!-- `AnalyticsViewModel` is now a `@MainActor @Observable final class`
+           owning `private(set) var records: [SetRecord]`, populated only via
+           `update(with:)` (same mapping WorkoutSession→SetRecord as before,
+           unchanged behavior). Its chart-facing methods (`e1RMTrend`,
+           `tonnageSeries`, `velocityLoadPoints`, `spotterFrequency`,
+           `totalTonnage`, `bestEstimatedOneRepMax`) now read the owned
+           `records` instead of taking a `from:` parameter — the pure
+           `PerformanceAnalytics` funcs are unchanged/reused, so chart output
+           is identical for identical input sessions. `AnalyticsView` now
+           holds `@State private var viewModel = AnalyticsViewModel()`, keeps
+           its `@Query private var sessions`, and feeds the VM via
+           `.onChange(of: sessions, initial: true)`; charts render from
+           `viewModel.records`/the above methods. Removed the throwaway
+           `HistoryViewModel().refreshSavedSessionCount(...)` call (and its
+           `.refreshable`/`modelContext` plumbing) per F2's requirement — the
+           `.refreshable` modifier itself is left for F5 to delete elsewhere
+           (History still has one). TDD: new
+           `SpottersaurusTests/AnalyticsViewModelTests.swift` (4 tests) covers
+           `update` populating/replacing derived `SetRecord`s, e1RM trend
+           output matching `PerformanceAnalytics.e1RMTrend` exactly for owned
+           records, and locale-agnostic tonnage/best-e1RM formatting (built
+           from the same `.formatted` calls, since the sim runs a
+           comma-decimal locale). Package `swift test`: 84 XCTest + 35 Swift
+           Testing, 0 failures (unaffected — Analytics lives in the app
+           target). App-target tests
+           (`-only-testing:SpottersaurusTests`): 10 tests, 0 failures.
+           `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
+           Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
 - [ ] **F3 — `MaxesViewModel` → @Observable hybrid** (TDD)
       Same pattern for the Maxes editor. Test derived output. Done-when: green.
 - [ ] **F4 — `ProgramsViewModel` → @Observable hybrid** (TDD)

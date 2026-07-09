@@ -1,8 +1,27 @@
 import Foundation
+import Observation
 import SpottersaurusKit
 
-struct AnalyticsViewModel {
-    func records(from sessions: [WorkoutSession]) -> [SetRecord] {
+/// Owns the derived analytics input the Analytics charts render. `AnalyticsView`
+/// keeps a lightweight `@Query` for CloudKit/SwiftData reactivity and pipes
+/// results in via `update(with:)` on change — the same hybrid pattern
+/// `HistoryViewModel` (F1) uses. The pure `PerformanceAnalytics` layer still
+/// does all the math; this type only owns the mapped `SetRecord` inputs.
+@MainActor
+@Observable
+final class AnalyticsViewModel {
+    /// The `SetRecord`s derived from the last `update(with:)` call. Set only
+    /// via `update(with:)`.
+    private(set) var records: [SetRecord] = []
+
+    /// Replaces the derived `SetRecord` inputs with a fresh mapping of
+    /// `sessions`. Call this from `@Query`'s `.onChange` (with an initial
+    /// load) so the owned state tracks live SwiftData/CloudKit updates.
+    func update(with sessions: [WorkoutSession]) {
+        records = Self.records(from: sessions)
+    }
+
+    private static func records(from sessions: [WorkoutSession]) -> [SetRecord] {
         sessions.flatMap { session in
             (session.completedSets ?? []).compactMap { set in
                 guard let lift = set.exercise?.kind else { return nil }
@@ -18,27 +37,27 @@ struct AnalyticsViewModel {
         }
     }
 
-    func e1RMTrend(from records: [SetRecord], lift: LiftKind) -> [PerformanceAnalytics.TrendPoint] {
+    func e1RMTrend(lift: LiftKind) -> [PerformanceAnalytics.TrendPoint] {
         PerformanceAnalytics.e1RMTrend(for: records, lift: lift)
     }
 
-    func tonnageSeries(from records: [SetRecord], lift: LiftKind) -> [PerformanceAnalytics.TonnagePoint] {
+    func tonnageSeries(lift: LiftKind) -> [PerformanceAnalytics.TonnagePoint] {
         PerformanceAnalytics.tonnageSeries(for: records, lift: lift)
     }
 
-    func velocityLoadPoints(from records: [SetRecord], lift: LiftKind) -> [PerformanceAnalytics.VelocityLoadPoint] {
+    func velocityLoadPoints(lift: LiftKind) -> [PerformanceAnalytics.VelocityLoadPoint] {
         PerformanceAnalytics.velocityLoadPoints(for: records, lift: lift)
     }
 
-    func spotterFrequency(from records: [SetRecord], lift: LiftKind?) -> PerformanceAnalytics.SpotterEventFrequency {
+    func spotterFrequency(lift: LiftKind?) -> PerformanceAnalytics.SpotterEventFrequency {
         PerformanceAnalytics.spotterEventFrequency(for: records, lift: lift)
     }
 
-    func totalTonnage(from records: [SetRecord]) -> String {
+    func totalTonnage() -> String {
         PerformanceAnalytics.tonnage(for: records).formatted(.number.precision(.fractionLength(0)))
     }
 
-    func bestEstimatedOneRepMax(from records: [SetRecord], lift: LiftKind) -> String {
+    func bestEstimatedOneRepMax(lift: LiftKind) -> String {
         let best = records
             .filter { $0.lift == lift }
             .map { PerformanceAnalytics.e1RM(for: $0) }

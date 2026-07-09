@@ -3,11 +3,10 @@ import SwiftUI
 import SpottersaurusKit
 
 struct AnalyticsView: View {
-    @Environment(\.modelContext) private var modelContext
     @Query private var sessions: [WorkoutSession]
     @State private var selectedLift: LiftKind = .bench
 
-    private let viewModel = AnalyticsViewModel()
+    @State private var viewModel = AnalyticsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -20,7 +19,7 @@ struct AnalyticsView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    if records.isEmpty {
+                    if viewModel.records.isEmpty {
                         ContentUnavailableView(
                             "No Analytics",
                             systemImage: "chart.xyaxis.line",
@@ -28,29 +27,25 @@ struct AnalyticsView: View {
                         )
                     } else {
                         AnalyticsSummaryGridView(
-                            bestE1RM: viewModel.bestEstimatedOneRepMax(from: records, lift: selectedLift),
-                            totalTonnage: viewModel.totalTonnage(from: records),
-                            spotterFrequency: viewModel.spotterFrequency(from: records, lift: selectedLift)
+                            bestE1RM: viewModel.bestEstimatedOneRepMax(lift: selectedLift),
+                            totalTonnage: viewModel.totalTonnage(),
+                            spotterFrequency: viewModel.spotterFrequency(lift: selectedLift)
                         )
 
-                        E1RMTrendChartView(points: viewModel.e1RMTrend(from: records, lift: selectedLift))
-                        TonnageChartView(points: viewModel.tonnageSeries(from: records, lift: selectedLift))
-                        VelocityLoadChartView(points: viewModel.velocityLoadPoints(from: records, lift: selectedLift))
-                        SpotterFrequencyChartView(frequency: viewModel.spotterFrequency(from: records, lift: selectedLift))
+                        E1RMTrendChartView(points: viewModel.e1RMTrend(lift: selectedLift))
+                        TonnageChartView(points: viewModel.tonnageSeries(lift: selectedLift))
+                        VelocityLoadChartView(points: viewModel.velocityLoadPoints(lift: selectedLift))
+                        SpotterFrequencyChartView(frequency: viewModel.spotterFrequency(lift: selectedLift))
                     }
                 }
                 .padding(Theme.Spacing.md)
             }
             .background(Theme.Colors.canvas.opacity(0.04))
             .navigationTitle("Analytics")
-            .refreshable {
-                HistoryViewModel().refreshSavedSessionCount(in: modelContext)
+            .onChange(of: sessions, initial: true) { _, newValue in
+                viewModel.update(with: newValue)
             }
         }
-    }
-
-    private var records: [SetRecord] {
-        viewModel.records(from: sessions)
     }
 }
 
