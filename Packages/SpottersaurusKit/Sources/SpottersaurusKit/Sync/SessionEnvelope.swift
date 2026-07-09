@@ -102,8 +102,12 @@ public struct CalibrationEnvelope: Codable, Sendable, Equatable {
 }
 
 /// A single live in-set sample, streamed from the Watch to the iPhone while a
-/// set is in progress (rep counter, current velocity, HR, elapsed time). Not
-/// persisted — purely a wire-format tick for the live mirror UI.
+/// set is in progress (rep counter, current velocity, HR, elapsed time,
+/// current Alert Stage, set N-of-M). Not persisted — purely a wire-format
+/// tick for the live mirror UI. See ADR 0001 (`docs/adr/
+/// 0001-live-session-surfaces-and-transport.md`): ticks carry running metrics
+/// + the current Alert Stage, with `LiveSetLifecycleEnvelope` (below) driving
+/// the hard set boundaries.
 public struct LiveTickEnvelope: Codable, Sendable, Equatable {
     /// Reps completed so far in the in-progress set.
     public var repCount: Int
@@ -114,13 +118,58 @@ public struct LiveTickEnvelope: Codable, Sendable, Equatable {
     public var heartRateBPM: Double
     /// Seconds since the set was armed (monotonic), matching the sample clock.
     public var elapsedSeconds: TimeInterval
+    /// Current spotter escalation level for this Live Set. Reuses
+    /// `AlertStage` (`Session/SetLifecycleController.swift`) rather than a
+    /// parallel wire-only enum, so the Watch's own lifecycle state is what
+    /// travels over the wire, unmodified.
+    public var alertStage: AlertStage
+    /// Zero-based index of the current set within the Live Session (the "N"
+    /// in "Set N of M").
+    public var setIndex: Int
+    /// Total number of sets in the Live Session (the "M" in "Set N of M").
+    public var setCount: Int
 
-    public init(repCount: Int, currentVelocityMS: Double, heartRateBPM: Double, elapsedSeconds: TimeInterval) {
+    public init(
+        repCount: Int,
+        currentVelocityMS: Double,
+        heartRateBPM: Double,
+        elapsedSeconds: TimeInterval,
+        alertStage: AlertStage = .none,
+        setIndex: Int = 0,
+        setCount: Int = 1
+    ) {
         self.repCount = repCount
         self.currentVelocityMS = currentVelocityMS
         self.heartRateBPM = heartRateBPM
         self.elapsedSeconds = elapsedSeconds
+        self.alertStage = alertStage
+        self.setIndex = setIndex
+        self.setCount = setCount
     }
+}
+
+/// An explicit Live Set Lifecycle Event marking the boundaries of a Live Set:
+/// `armed` (set started; carries the concrete prescription + its position
+/// within the Live Session) and `ended` (racked/completed). Distinct from
+/// `LiveTickEnvelope`'s per-tick metric stream — these drive the iPhone
+/// in-workout view, Live Activity, and Watch Always-On Display
+/// deterministically, replacing a tick-recency heuristic (see ADR 0001 +
+/// the "Live Set Lifecycle Event" glossary entry in `CONTEXT.md`).
+public enum LiveSetLifecycleEnvelope: Codable, Sendable, Equatable {
+    /// A new Live Set has started.
+    case armed(
+        lift: LiftKind,
+        targetReps: Int,
+        weightKg: Double,
+        /// Zero-based position of this set within the Live Session.
+        setIndex: Int,
+        /// Total number of sets in the Live Session.
+        setCount: Int
+    )
+    /// The Live Set (and, when it is the last set, the whole Live Session)
+    /// has ended — racked or completed. Carries no payload; `SessionEnvelope`
+    /// is the source of truth for the finished-set summary.
+    case ended
 }
 
 /// A live control message from iPhone to Watch. Commands are intentionally

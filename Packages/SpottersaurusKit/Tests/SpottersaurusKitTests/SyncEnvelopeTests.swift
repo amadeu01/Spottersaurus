@@ -103,6 +103,75 @@ final class SyncEnvelopeTests: XCTestCase {
         XCTAssertEqual(decoded, tick)
     }
 
+    /// The pre-existing scaffold init (no alert stage / set index / set
+    /// count) must keep compiling untouched — new params are additive with
+    /// backward-compatible defaults, not a breaking signature change.
+    func testLiveTickEnvelopeOldInitStillDefaultsAlertStageAndSetPosition() {
+        let legacy = LiveTickEnvelope(
+            repCount: 3,
+            currentVelocityMS: 0.34,
+            heartRateBPM: 142,
+            elapsedSeconds: 18.7
+        )
+        XCTAssertEqual(legacy.alertStage, .none)
+        XCTAssertEqual(legacy.setIndex, 0)
+        XCTAssertEqual(legacy.setCount, 1)
+    }
+
+    func testLiveTickEnvelopeRoundTripsWithAlertStageAndSetPosition() throws {
+        let tick = LiveTickEnvelope(
+            repCount: 2,
+            currentVelocityMS: 0.18,
+            heartRateBPM: 151,
+            elapsedSeconds: 42.3,
+            alertStage: .grinding,
+            setIndex: 2,
+            setCount: 5
+        )
+
+        let decoded = try roundTrip(tick)
+        XCTAssertEqual(decoded, tick)
+        XCTAssertEqual(decoded.alertStage, .grinding)
+        XCTAssertEqual(decoded.setIndex, 2)
+        XCTAssertEqual(decoded.setCount, 5)
+    }
+
+    // MARK: LiveSetLifecycleEnvelope
+
+    func testLiveSetLifecycleEnvelopeArmedRoundTrips() throws {
+        let armed = LiveSetLifecycleEnvelope.armed(
+            lift: .squat,
+            targetReps: 5,
+            weightKg: 140,
+            setIndex: 1,
+            setCount: 4
+        )
+
+        let decoded = try roundTrip(armed)
+        XCTAssertEqual(decoded, armed)
+        if case .armed(let lift, let targetReps, let weightKg, let setIndex, let setCount) = decoded {
+            XCTAssertEqual(lift, .squat)
+            XCTAssertEqual(targetReps, 5)
+            XCTAssertEqual(weightKg, 140)
+            XCTAssertEqual(setIndex, 1)
+            XCTAssertEqual(setCount, 4)
+        } else {
+            XCTFail("expected .armed, got \(decoded)")
+        }
+    }
+
+    func testLiveSetLifecycleEnvelopeEndedRoundTrips() throws {
+        let ended = LiveSetLifecycleEnvelope.ended
+
+        let decoded = try roundTrip(ended)
+        XCTAssertEqual(decoded, ended)
+        if case .ended = decoded {
+            // expected
+        } else {
+            XCTFail("expected .ended, got \(decoded)")
+        }
+    }
+
     // MARK: WatchCommandEnvelope
 
     func testWatchCommandEnvelopeRoundTrips() throws {

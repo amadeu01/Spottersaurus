@@ -25,7 +25,9 @@ public enum SetLifecycleState: Sendable, Equatable {
 
 /// The escalation sub-state driven by `SpotEngine` events. Independent of the
 /// main lifecycle so a grind/rack-it alert never derails rep counting.
-public enum AlertStage: Sendable, Equatable {
+/// `Codable` so it can ride on the Watch -> iPhone `LiveTickEnvelope` wire
+/// format (see `Sync/SessionEnvelope.swift`) without a parallel enum.
+public enum AlertStage: Sendable, Equatable, Codable {
     case none
     case grinding
     case rackIt
