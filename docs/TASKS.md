@@ -656,32 +656,53 @@ in parallel with the rest. Review each subagent commit before dispatching depend
 > orchestrator reviews each commit before dispatching dependents.
 
 ### Block L — Live-session foundation (stream + transport + phone state)
-- [ ] **L1 — Live Set Lifecycle Events** (TDD, package)
+- [x] **L1 — Live Set Lifecycle Events** (TDD, package) (2026-07-09) — `371a450`
       Add `armed`(lift/target reps/weight/set index/set count) and `ended` signals
       to the Watch→phone stream (extend the envelope set in `Sync/`). Ticks carry
       running metrics + current Alert Stage + set N-of-M. Pure encode/decode +
       reducer tests. Done-when: package tests green.
-- [ ] **L2 — Coalesce-to-latest transport** (TDD where pure) — depends on L1
+      <!-- `LiveSetLifecycleEnvelope` (.armed/.ended) + `LiveTickEnvelope`
+           gained alertStage/setIndex/setCount (defaulted). Reused AlertStage
+           from SetLifecycleController (+Codable). 4 round-trip tests. -->
+- [x] **L2 — Coalesce-to-latest transport** (TDD where pure) (2026-07-09) — `317dd24` — depends on L1
       Rewrite `WatchPlannedSessionStore.send(liveTick:)`: keep the newest tick,
       send it when the in-flight send completes (no drop-on-in-flight), rep-
       completion ticks prioritized, ~2 s heartbeat, remove the 5 s hard backoff
       (small/adaptive instead). Extract the coalescing decision into a pure,
       testable type. Done-when: coalescer tests green, Watch builds.
-- [ ] **L3 — `LiveSessionMonitor` (iPhone)** (TDD state machine) — depends on L1
+      <!-- Pure LiveTickCoalescer (offer/completed/failed, single pending slot)
+           + 7 tests. Wired into send(liveTick:); 0.75s adaptive backoff (was
+           5s); gate minimumInterval 1→2s heartbeat. Watch BUILD SUCCEEDED. -->
+- [x] **L3 — `LiveSessionMonitor` (iPhone)** (TDD state machine) (2026-07-09) — `0fbb97c` — depends on L1
       Session-scoped state machine (`idle→armed→active↔resting→ended`) fed by
       lifecycle events + ticks, with the 5-min staleness timeout; replaces the
       tick-recency heuristic in `PhoneWatchSessionMonitor`. Drives all iPhone
       surfaces. Test the state machine + timeout with injected time. Done-when:
       tests green, iOS builds.
+      <!-- Pure LiveSessionState reducer (phase idle/armed/active/resting/ended,
+           Identity+Metrics, injected-time isStale, 5-min timeout, 13 tests).
+           LiveSessionMonitor @Observable wraps it. iOS WatchLink decodes keyed
+           "liveSetLifecycle" from message+userInfo, onLifecycle callback;
+           PlannerTabsView feeds monitor. iOS + Watch BUILD SUCCEEDED. -->
+
 
 ### Block M — Multi-set Watch execution (the "everything is bench" fix)
-- [ ] **M1 — Watch runs the whole day, manual arm per set** (TDD pure) — depends on L1
+- [x] **M1 — Watch runs the whole day, manual arm per set** (TDD pure) (2026-07-09) — `e5ed244` (M1a) + `e55b5d5` (M1b) — depends on L1
       Replace `currentPlannedSet()`'s `firstSet`-only + bench-100 fallback: track
       an ordered set cursor, advance on rack→rest→next (queued, **manual arm**),
       expose "Set N of M" + next-set prescription during rest. No planned session
       received → honest "no session sent" empty state, not a fake bench set.
       Extract the cursor/advancement as a pure Sendable type + tests. Done-when:
       advancement tests green, Watch builds, emits L1 `armed`/`ended` per session.
+      <!-- M1a: pure PlannedSessionCursor (current/next/setIndex/setCount/advance/
+           isFinished, empty→nil, 12 tests). M1b: cursor wired into
+           WatchPlannedSessionStore (@Observable cursor, bench fallback GONE),
+           WatchRootView ScreenState (noSession/runningSet/sessionComplete),
+           per-set LiveSetView .id() so each advance starts .idle (manual arm),
+           advance on rack+rest-complete, NoPlannedSessionView/SessionCompleteView/
+           SetPositionBadgeView/NextSetPreviewView, .armed/.ended emitted keyed
+           ("liveSetLifecycle"). Watch BUILD SUCCEEDED. -->
+
 - [ ] **M2 — iPhone Session Override editor + Send** (TDD build, iOS UI) — depends on M1
       Tap today's session on Today → quick editor (per set: lift, target reps,
       weight, rest, AMRAP) → Send-to-Watch ships the adjusted
@@ -690,12 +711,18 @@ in parallel with the rest. Review each subagent commit before dispatching depend
       session sends, Program unchanged.
 
 ### Block S — iPhone live surfaces
-- [ ] **S1 — In-Workout View (app-wide dismissible takeover)** (iOS UI, `#Preview`) — depends on L3
+- [x] **S1 — In-Workout View (app-wide dismissible takeover)** (iOS UI, `#Preview`) (2026-07-09) — `36a51a6` — depends on L3
       Full-screen cover presented from root on `armed`, dismissible with a
       "return to set" pill, auto-dismissed on session end. Big reps/target,
       Mean Concentric Velocity, HR, Alert-Stage banner (amber/red tint), rest
       ring, set N-of-M. `#Preview` idle/active/grinding/rackIt/resting. Done-when:
       builds, previews render, appears/updates/dismisses off `LiveSessionMonitor`.
+      <!-- InWorkoutView (RingGauge reps, Alert-Stage tint banner, GlassCard
+           velocity+HR, resting ring) + ReturnToSetPill. Presented app-wide from
+           ContentView via .fullScreenCover bound to LiveSessionMonitor;
+           dismissedInWorkout resets on new session. 6 previews. iOS BUILD
+           SUCCEEDED. -->
+
 - [ ] **R3 — Today collapsible card (idle/disconnected + reconnect)** (iOS UI, `#Preview`) — depends on L3
       Reconcile the earlier R3: Today shows a compact card when idle/Watch
       disconnected, with a reconnect affordance; the "expand during a set" role is
