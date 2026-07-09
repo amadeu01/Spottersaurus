@@ -18,8 +18,18 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     private let decoder: JSONDecoder
     private var plannedSession: PlannedSessionEnvelope?
     private var session: WCSession?
-    private var isLiveTickInFlight = false
-    private var liveTickBackoffUntil: Date?
+    /// Coalesce-to-latest state for the live-tick transport (ADR 0001):
+    /// never drop the freshest tick behind an in-flight `sendMessageData`
+    /// call — see `LiveTickCoalescer` (SpottersaurusKit/Sync). Guarded by
+    /// `lock` alongside the rest of this class's mutable state.
+    private var liveTickCoalescer = LiveTickCoalescer()
+    /// Small, fixed backoff before retrying a live tick after a transport
+    /// failure (ADR 0001: "no long hard failure-backoff", replacing the old
+    /// 5 s hard-coded delay). This only delays the automatic retry of the
+    /// tick the coalescer already promoted to pending — it never blocks a
+    /// fresh `send(liveTick:)` call, which always coalesces through
+    /// `liveTickCoalescer` normally.
+    private let liveTickRetryBackoff: TimeInterval = 0.75
     private let logger = LoggerGroup.watch
 
     /// Latest `WCSession` state observed on the Watch side, pushed from
@@ -111,27 +121,45 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         logger.notice(.watchLink, "advanced planned session cursor to setIndex=\(advanced.setIndex) of \(advanced.setCount)")
     }
 
+    /// Coalesce-to-latest live-tick send (ADR 0001 / L2): never drops the
+    /// freshest tick behind an in-flight `sendMessageData` call. `offer`
+    /// either hands back this exact tick to send now (idle) or stores it as
+    /// the pending-latest and returns `nil` (a send is already in flight) —
+    /// in the latter case the completion/error handlers below flush it as
+    /// soon as the in-flight send finishes.
     func send(liveTick: LiveTickEnvelope) {
-        guard let session, session.isReachable, let data = try? encoder.encode(liveTick) else {
-            logger.debug(.watchLink, "skipping live tick; phone not reachable or encode failed")
+        guard let session, session.isReachable else {
+            logger.debug(.watchLink, "skipping live tick; phone not reachable")
             return
         }
 
         lock.lock()
-        let isBackedOff = liveTickBackoffUntil.map { Date() < $0 } ?? false
-        guard !isLiveTickInFlight, !isBackedOff else {
-            lock.unlock()
-            logger.debug(.watchLink, "skipping live tick; send in flight or backed off")
-            return
-        }
-        isLiveTickInFlight = true
+        let toSendNow = liveTickCoalescer.offer(liveTick)
         lock.unlock()
 
-        logger.debug(.watchLink, "sending live tick reps=\(liveTick.repCount) velocity=\(liveTick.currentVelocityMS) hr=\(liveTick.heartRateBPM)")
+        guard let toSendNow else {
+            logger.debug(.watchLink, "coalescing live tick reps=\(liveTick.repCount); send already in flight")
+            return
+        }
+
+        transmit(toSendNow, through: session)
+    }
+
+    /// Actually performs the `WCSession` round-trip for a tick the coalescer
+    /// has already promoted to "in flight". Also used to flush a
+    /// pending-latest tick once the previous send completes/fails/retries.
+    private func transmit(_ tick: LiveTickEnvelope, through session: WCSession) {
+        guard let data = try? encoder.encode(tick) else {
+            logger.error(.watchLink, "live tick encode failed; freeing in-flight slot")
+            freeLiveTickSlotAndFlushPending(through: session)
+            return
+        }
+
+        logger.debug(.watchLink, "sending live tick reps=\(tick.repCount) velocity=\(tick.currentVelocityMS) hr=\(tick.heartRateBPM)")
         session.sendMessageData(data) { [weak self] _ in
-            self?.markLiveTickDelivered()
+            self?.markLiveTickDelivered(through: session)
         } errorHandler: { [weak self] error in
-            self?.markLiveTickFailed(error)
+            self?.markLiveTickFailed(error, through: session)
         }
     }
 
@@ -279,19 +307,51 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         session.transferUserInfo([finishedSessionKey: data])
     }
 
-    private func markLiveTickDelivered() {
+    /// A live tick send completed successfully. Frees the coalescer's
+    /// in-flight slot; if a fresher tick had arrived while this one was in
+    /// flight, it's the pending-latest — send it right away (no backoff:
+    /// the transport is healthy).
+    private func markLiveTickDelivered(through session: WCSession) {
         lock.lock()
-        isLiveTickInFlight = false
-        liveTickBackoffUntil = nil
+        let next = liveTickCoalescer.completed()
         lock.unlock()
+
+        if let next {
+            transmit(next, through: session)
+        }
     }
 
-    private func markLiveTickFailed(_ error: Error) {
+    /// A live tick send failed. Frees the coalescer's in-flight slot the
+    /// same way `completed()` does; if a pending-latest tick was waiting,
+    /// retry it after a small fixed backoff (not the old 5 s hard delay) so
+    /// a flaky link doesn't hot-loop, while still never dropping the
+    /// freshest tick.
+    private func markLiveTickFailed(_ error: Error, through session: WCSession) {
         lock.lock()
-        isLiveTickInFlight = false
-        liveTickBackoffUntil = Date().addingTimeInterval(5)
+        let next = liveTickCoalescer.failed()
         lock.unlock()
+
         logger.warning(.watchLink, "live tick send failed: \(error.localizedDescription)")
+
+        guard let next else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + liveTickRetryBackoff) { [weak self] in
+            self?.transmit(next, through: session)
+        }
+    }
+
+    /// Shared failure path for a send that never reached `sendMessageData`
+    /// (e.g. encode failure) — frees the coalescer slot and flushes any
+    /// pending-latest tick immediately, since the failure was local and
+    /// unrelated to link health.
+    private func freeLiveTickSlotAndFlushPending(through session: WCSession) {
+        lock.lock()
+        let next = liveTickCoalescer.failed()
+        lock.unlock()
+
+        if let next {
+            transmit(next, through: session)
+        }
     }
 
     #if DEBUG

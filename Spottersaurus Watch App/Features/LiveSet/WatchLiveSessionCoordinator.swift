@@ -96,7 +96,10 @@ final class WatchLiveSessionCoordinator {
 private struct LiveTickGate {
     private var lastSentAt: Date?
     private var lastRepCount = -1
-    private let minimumInterval: TimeInterval = 1
+    /// ~2 s HR/elapsed heartbeat cadence between reps (ADR 0001 / L2); rep-
+    /// count changes always send immediately regardless of this interval —
+    /// see `shouldSend` below.
+    private let minimumInterval: TimeInterval = 2
 
     mutating func shouldSend(_ envelope: LiveTickEnvelope, now: Date = Date()) -> Bool {
         guard envelope.repCount == lastRepCount, let lastSentAt else {
