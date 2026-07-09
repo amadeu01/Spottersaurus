@@ -89,11 +89,25 @@ non-dismissable "Data is NOT being saved" banner. Local fallback logs but runs n
 Grill decision: Watch requests `read: heartRate`, `share: workout (+ activeEnergy)`
 on **first arm**, asked once. No auth today → HR empty + nothing written to Apple Health.
 
-- [ ] **C1 — `HealthKitAuthorizing` abstraction** (TDD)
+- [x] **C1 — `HealthKitAuthorizing` abstraction** (TDD) (2026-07-09)
       Protocol wrapping `HKHealthStore.requestAuthorization(toShare:read:)` +
       status check, with the concrete type list (share: `workout`, `activeEnergyBurned`;
       read: `heartRate`). Real impl + a fake for tests. Test the fake records requested
       types + gates "ask once". Done-when: tests green.
+      <!-- Protocol `HealthKitAuthorizing` + `HealthAuthorizationStatus` (no
+           HealthKit import — HealthKit has no macOS availability, and the
+           package's tests run headless on macOS per Package.swift) live in
+           SpottersaurusKit/HealthKit/HealthKitAuthorizing.swift, so they're
+           reachable from package tests (no Watch test target exists). The
+           concrete `HKHealthStore`-backed `HealthKitAuthorizer` actor (share:
+           workoutType + activeEnergyBurned; read: heartRate; "ask once" gated
+           via UserDefaults) lives next to the adapter in
+           `Spottersaurus Watch App/Features/LiveSet/HealthKitAuthorizer.swift`.
+           New `HealthKitAuthorizingTests.swift` (3 tests) + a `FakeHealthKitAuthorizer`
+           actor assert the gate collapses two requests into one and that a
+           throwing/denied request still lets the caller proceed without
+           re-attempting on a later arm. Not wired into
+           `WatchWorkoutSessionAdapter` yet (C2). -->
 - [ ] **C2 — Request auth on first arm** (TDD-light + on-device note)
       In `WatchWorkoutSessionAdapter.start`, call the authorizer **before**
       `beginCollection`, gated so it prompts once. Log outcome under `.workout`.
