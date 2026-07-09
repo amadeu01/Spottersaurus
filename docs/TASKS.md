@@ -7,6 +7,160 @@ Legend: `- [ ]` todo · `- [x] … (2026-06-29)` done.
 
 ---
 
+## Phase 0 — Foundation: Reliability & Observability
+
+> Inserted 2026-07-09. Phase 9 (human spotter) + Phase 10 (design polish) are
+> **frozen** until Phase 0 lands. Origin: user reported the app is a black box —
+> can't tell if SwiftData saves, when the Watch is connected, why HealthKit never
+> synced (never authorized), that most Watch data looks mocked, small tap targets,
+> a glitchy pull-to-refresh, and questioned the SwiftUI/VM architecture.
+>
+> **Execution rules for this phase**
+> - Each task is sized for a single **Sonnet 5 subagent** (`ios-engineer`).
+> - Every task is **TDD** (`/tdd`): write a failing test first where the logic is
+>   pure/testable, then implement. UI-only tasks add a `#Preview` + a build-green
+>   check instead of an XCTest.
+> - Keep the package `swift test` green and both app targets building after every task.
+> - One task = one commit. The orchestrator reviews each subagent commit before
+>   dispatching the next dependent task.
+> - Decisions locked in the 2026-07-09 grill are recorded inline per block.
+
+### Block A — Logging (LLM-debuggable). Do first; everything else logs through it.
+Grill decision: keep the `AppLogger`/`LoggerGroup` sink abstraction; add a filterable
+Xcode-console sink **and** an exportable NDJSON file sink so an LLM can read logs.
+
+- [ ] **A1 — `ConsoleLogSink`** (pure, TDD)
+      New `Diagnostics/ConsoleLogSink.swift` in `SpottersaurusKit`. Conforms to
+      `AppLogger`; formats `"[\(level)][\(category)] \(message)"` and prints to
+      stdout so Xcode's console filter box matches on `[motion]` etc. Test: inject a
+      capture closure (make the print target injectable) and assert the formatted
+      line for each level/category. Done-when: unit test green, sink formats exactly.
+- [ ] **A2 — `FileLogSink` NDJSON ring buffer** (actor, TDD)
+      New `Diagnostics/FileLogSink.swift`. Sendable `actor` appending one JSON object
+      per line (`ts` ISO8601, `level`, `category`, `target`, `message`) to a file in
+      the shared App Group container (`group.amadeu.dev.Spottersaurus`). Ring-cap by
+      byte size (rotate/truncate oldest). Expose async `exportURL()` / `readAll()`.
+      Test against a temp dir: append N lines → assert NDJSON parses, cap trims oldest,
+      concurrent appends don't interleave. Done-when: tests green.
+- [ ] **A3 — Wire sinks into `LoggerGroup`** (TDD-light)
+      Extend `LoggerGroup.iPhone` / `.watch` to fan out to `OSLogLogger` +
+      `ConsoleLogSink` + `FileLogSink` (shared file path per target, `target` field =
+      `"iphone"`/`"watch"`). Test: a `LoggerGroup` with spy sinks forwards to all.
+      Done-when: both targets build, existing log calls now hit all three sinks.
+- [ ] **A4 — In-app log viewer + export** (iPhone UI, `#Preview`)
+      New debug screen (reachable from a Settings/Debug entry) listing recent NDJSON
+      lines with a category filter, plus a `ShareLink`/share sheet exporting the log
+      file. `#Preview` with seeded lines. Done-when: builds, preview renders, export
+      produces the file. (No XCTest; UI-only.)
+
+### Block B — Persistence truth (#1). Depends on A3.
+Grill decision: log the winning store tier; if it lands **inMemory**, show a
+non-dismissable "Data is NOT being saved" banner. Local fallback logs but runs normal.
+
+- [ ] **B1 — Store tier is observable + logged** (TDD)
+      Refactor `SpottersaurusApp.makeContainer()` to return the container **and** a
+      `StoreTier` (`.cloudKit`/`.local`/`.inMemory`); log the winner under
+      `.persistence`. Put `StoreTier` + the selection logic in `SpottersaurusKit`
+      (pure, injectable failing-factory) so it's testable without real CloudKit.
+      Test: forced cloudKit failure → `.local`; both fail → `.inMemory`, each logged.
+      Done-when: tests green, app compiles with the new return shape.
+- [ ] **B2 — inMemory warning banner** (iPhone UI, `#Preview`)
+      When `StoreTier == .inMemory`, overlay a persistent, non-dismissable banner
+      ("Data is NOT being saved — storage unavailable"). `#Preview` both states.
+      Done-when: builds, preview shows banner only for inMemory.
+
+### Block C — HealthKit authorization (#3/#4). The core sync bug.
+Grill decision: Watch requests `read: heartRate`, `share: workout (+ activeEnergy)`
+on **first arm**, asked once. No auth today → HR empty + nothing written to Apple Health.
+
+- [ ] **C1 — `HealthKitAuthorizing` abstraction** (TDD)
+      Protocol wrapping `HKHealthStore.requestAuthorization(toShare:read:)` +
+      status check, with the concrete type list (share: `workout`, `activeEnergyBurned`;
+      read: `heartRate`). Real impl + a fake for tests. Test the fake records requested
+      types + gates "ask once". Done-when: tests green.
+- [ ] **C2 — Request auth on first arm** (TDD-light + on-device note)
+      In `WatchWorkoutSessionAdapter.start`, call the authorizer **before**
+      `beginCollection`, gated so it prompts once. Log outcome under `.workout`.
+      Test: fake authorizer is invoked once across two arms; start still proceeds when
+      denied (existing manual fallback). Done-when: tests green; leave an on-device
+      verify checkbox.
+- [ ] **C3 — Surface auth state on Watch** (Watch UI, `#Preview`)
+      Show a compact indicator when HR auth is denied/undetermined so the user knows
+      why HR is blank. `#Preview` the states. Done-when: builds, preview renders.
+
+### Block D — Connection visibility (#2). Depends on A3.
+Grill decision: WCSession state exists but is only logged; surface it reactively.
+
+- [ ] **D1 — `PhoneWatchSessionMonitor` exposes WCSession state** (TDD-light)
+      Add `@Observable` fields for `activationState`, `isReachable`, `isPaired`,
+      `isWatchAppInstalled`; update them from the iOS `WatchLink` delegate callbacks.
+      Test the reducer that maps a session-state snapshot → a `ConnectionStatus` enum
+      (pure). Done-when: test green, monitor updates on delegate events.
+- [ ] **D2 — Connection status chip** (iPhone UI, `#Preview`)
+      Small reusable chip (connected / unreachable / not paired / app not installed),
+      shown on Today and reused inside `LiveWatchStatusCardView`. `#Preview` each state.
+      Done-when: builds, previews render, Today shows live status.
+- [ ] **D3 — Phone-reachability chip on Watch** (Watch UI, `#Preview`)
+      Mirror a compact reachability chip on the Watch root using
+      `WatchPlannedSessionStore` session state. `#Preview` states. Done-when: builds.
+
+### Block E — Watch real-vs-mocked (#5/#6). Depends on C2.
+Grill decision: real motion/HR pipeline is primary; move manual +rep/flag behind a
+`DEBUG` dev panel; **`rackIt` stays always-available** (safety bail). Surface live
+pipeline telemetry so it's not a black box.
+
+- [ ] **E1 — Gate manual controls behind DEBUG dev panel** (Watch UI)
+      In `LiveSetControlsView`, keep only Arm/Rack (+ always-visible `rackIt` bail) for
+      release; move `completeRep`/`flagGrinding` into a `#if DEBUG` hidden dev panel
+      (e.g. long-press to reveal). Auto-detection drives reps in release. Done-when:
+      release build hides manual rep/flag; DEBUG shows them; `rackIt` always present.
+- [ ] **E2 — Live pipeline telemetry readout** (Watch UI, `#Preview`)
+      Small readout: sensor running?, samples/sec, HR flowing?, last-sample age — from
+      the live coordinator/view model. `#Preview` with seeded telemetry. Done-when:
+      builds, preview renders, values update while armed.
+
+### Block F — Architecture + reactivity (#8/#9). Independent of A–E.
+Grill decision: convert list VMs to `@Observable` classes owning derived state,
+**hybrid** — the view keeps a light `@Query` and pipes results into the VM via
+`.onChange`, preserving CloudKit reactivity while making VMs testable. Remove the
+no-op `.refreshable`. Add `#Preview` everywhere.
+
+- [ ] **F1 — `HistoryViewModel` → @Observable hybrid** (TDD)
+      Convert to `@Observable final class`; it accepts `[WorkoutSession]` and exposes
+      sorted/derived output. `HistoryView` keeps `@Query`, feeds the VM via
+      `.onChange(of: sessions)` + initial load. Test derived ordering/summary output.
+      Done-when: test green, list still updates on data change.
+- [ ] **F2 — `AnalyticsViewModel` → @Observable hybrid** (TDD)
+      Same pattern; fold the throwaway `HistoryViewModel()` usage out. Test the
+      derived analytics inputs. Done-when: test green, charts still render.
+- [ ] **F3 — `MaxesViewModel` → @Observable hybrid** (TDD)
+      Same pattern for the Maxes editor. Test derived output. Done-when: green.
+- [ ] **F4 — `ProgramsViewModel` → @Observable hybrid** (TDD)
+      Same pattern for Programs list. Test derived output. Done-when: green.
+- [ ] **F5 — Remove no-op `.refreshable`** (fixes #8 by deletion)
+      Delete `.refreshable` from `HistoryView` + `AnalyticsView` (data is live via
+      `@Query`); drop the now-unused `refreshSavedSessionCount` if nothing else calls
+      it. Done-when: builds, no pull-to-refresh jank, no dead code.
+- [ ] **F6 — `#Preview` sweep (iPhone)**
+      Add `#Preview` (using `makeModelContainer(inMemory:true)` + minimal seed) to
+      Today, Programs, ProgramDetail, builders, Maxes, Review, SessionDetail, and the
+      components missing one. Done-when: every iPhone view has a rendering preview.
+- [ ] **F7 — `#Preview` sweep (Watch)**
+      Add `#Preview` to the Watch feature views + components missing one (LiveSet
+      panels, controls, overlays, metric tiles). Done-when: every Watch view previews.
+
+### Block G — Touch targets (#7). Independent.
+- [ ] **G1 — 44pt touch-target audit (Watch)**
+      Audit crown-mode, header, and calibration-panel controls to ≥44pt hit targets
+      (liveButtons already comply). Done-when: all interactive Watch controls ≥44pt.
+
+### Phase 0 — dependency order for dispatch
+`A1 → A2 → A3` (then `A4`, `B1→B2`, `D1→D2/D3` can run once A3 lands) ·
+`C1 → C2 → C3` · `E1/E2` after `C2` · `F1–F7` and `G1` are independent and can run
+in parallel with the rest. Review each subagent commit before dispatching dependents.
+
+---
+
 ## Phase 1 — Project setup
 - [x] Create `Packages/SpottersaurusKit` local Swift package (Package.swift, iOS+watchOS platforms) (2026-06-29)
 - [x] Package source dirs: `Model/`, `Detection/`, `Sync/`, `Design/`, plus `Tests/` (2026-06-29)
