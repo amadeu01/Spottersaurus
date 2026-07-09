@@ -18,6 +18,12 @@ enum WatchCommandSendStatus: String, Sendable {
 struct PlannerDependencies {
     var logger: LoggerGroup
     var sendPlannedSessionToWatch: @MainActor (Program, ProgramDay, [UserMaxes]) async -> PlannedSessionSendStatus
+    /// Sends an already-resolved (and possibly Session-Override-adjusted)
+    /// envelope directly, bypassing `.make(program:day:maxes:)` — the path
+    /// used by `SessionOverrideEditorView` (Phase 0.2 M2) so an ephemeral
+    /// per-send edit never has to round-trip back through the `Program`/
+    /// `PlannedSet` SwiftData models.
+    var sendPlannedSessionEnvelopeToWatch: @MainActor (PlannedSessionEnvelope) async -> PlannedSessionSendStatus
     var sendWatchCommand: @MainActor (WatchCommandEnvelope.Kind) async -> WatchCommandSendStatus
 
     static let live = PlannerDependencies(
@@ -27,6 +33,12 @@ struct PlannerDependencies {
             LoggerGroup.iPhone.notice(.watchLink, "sending planned session id=\(envelope.id) sets=\(envelope.sets.count)")
             let status = await WatchLink.shared.send(plannedSession: envelope)
             LoggerGroup.iPhone.info(.watchLink, "planned session send status=\(status.rawValue)")
+            return status
+        },
+        sendPlannedSessionEnvelopeToWatch: { envelope in
+            LoggerGroup.iPhone.notice(.watchLink, "sending overridden planned session id=\(envelope.id) sets=\(envelope.sets.count)")
+            let status = await WatchLink.shared.send(plannedSession: envelope)
+            LoggerGroup.iPhone.info(.watchLink, "overridden planned session send status=\(status.rawValue)")
             return status
         },
         sendWatchCommand: { command in

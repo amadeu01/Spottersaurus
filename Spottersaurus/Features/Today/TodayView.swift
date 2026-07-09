@@ -9,6 +9,7 @@ struct TodayView: View {
     @State private var viewModel = TodayViewModel()
     @State private var watchMonitor = PhoneWatchSessionMonitor.shared
     @State private var liveSessionMonitor = LiveSessionMonitor.shared
+    @State private var isPresentingOverrideEditor = false
 
     var body: some View {
         NavigationStack {
@@ -29,7 +30,18 @@ struct TodayView: View {
 
                     if let program = viewModel.activeProgram(from: programs),
                        let day = viewModel.todaysProgramDay(in: program) {
-                        TodaySessionCard(program: program, day: day, maxes: maxes)
+                        // Tapping the card opens the ephemeral Session
+                        // Override editor (Phase 0.2 M2) so the lifter can
+                        // autoregulate today's loads/reps by feel before
+                        // sending — this never mutates `program`/`day`. The
+                        // button below stays a direct "send as planned" path.
+                        Button {
+                            isPresentingOverrideEditor = true
+                        } label: {
+                            TodaySessionCard(program: program, day: day, maxes: maxes)
+                        }
+                        .buttonStyle(.plain)
+
                         PrimaryButton("Send to Watch", systemImage: "applewatch", tint: Theme.Colors.brandOrange) {
                             Task {
                                 await viewModel.sendPlannedSession(program: program, day: day, maxes: maxes, using: dependencies)
@@ -47,6 +59,12 @@ struct TodayView: View {
             }
             .background(Theme.Colors.canvas.opacity(0.04))
             .navigationTitle("Today")
+            .sheet(isPresented: $isPresentingOverrideEditor) {
+                if let program = viewModel.activeProgram(from: programs),
+                   let day = viewModel.todaysProgramDay(in: program) {
+                    SessionOverrideEditorView(program: program, day: day, maxes: maxes)
+                }
+            }
         }
     }
 
