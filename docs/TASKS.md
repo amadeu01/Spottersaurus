@@ -533,13 +533,46 @@ in parallel with the rest. Review each subagent commit before dispatching depend
            green. `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
            Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. `-only-testing:
            SpottersaurusTests`: TEST SUCCEEDED (19 cases). -->
-- [ ] **H2 — `HealthImporter` (read HKWorkout + bodyMass → app models)** (TDD pure mapping)
+- [x] **H2 — `HealthImporter` (read HKWorkout + bodyMass → app models)** (TDD pure mapping) (2026-07-09)
       A service that queries recent `HKWorkout` (functionalStrengthTraining only) +
       most-recent `bodyMass` and maps them into app models. Split PURE mapping
       (HK-neutral value structs → domain models / dedupe by date+id) from the HK
       query (wrap the query behind a small protocol so the mapping is unit-tested
       without HealthKit). TDD the mapping in `SpottersaurusTests` or package. Idempotent
       (re-import doesn't duplicate). Done-when: mapping tests green, iOS builds.
+      <!-- New `SpottersaurusKit/HealthKit/HealthDataReading.swift`: HK-neutral
+           value types (`ImportedWorkoutActivity`, `ImportedWorkout`,
+           `ImportedBodyWeight`), the `HealthDataReading` query protocol
+           (`recentWorkouts(limit:)` / `latestBodyWeight()`), the pure
+           `HealthWorkoutMapper.map(_:)` (filters to
+           `.functionalStrengthTraining`, collapses duplicates by a dedupe key
+           — HK UUID when present, else an ISO8601 start-date string — via a
+           `Set<String>` seen-check, first-seen order preserved), the mapped
+           `ImportedWorkoutSession` output type (shaped to match
+           `WorkoutSession`'s `date`/`healthKitWorkoutUUID` fields so H3 can
+           construct one directly — no `CompletedSet` since Health imports
+           carry no reps/weight/velocity, per the task's "lightweight record"
+           allowance; no new SwiftData model added), `HealthImportResult`, and
+           the injectable `HealthImporter` (takes a `HealthDataReading`, reads
+           workouts + body weight concurrently via `async let`, maps through
+           `HealthWorkoutMapper`, returns the result — no persistence, that's
+           H3). New `Spottersaurus/Features/Health/PhoneHealthDataReader.swift`:
+           the real `HKHealthStore`-backed `HealthDataReading` conformer,
+           querying `HKWorkout` via `HKSampleQueryDescriptor` filtered to
+           `.functionalStrengthTraining` (newest first) and the most recent
+           `HKQuantityType(.bodyMass)` sample, converting explicitly via
+           `.gramUnit(with: .kilo)`; not wired into any service yet (H3 does
+           that). TDD: new `HealthImporterTests.swift` (10 XCTest cases) covers
+           in-batch dedupe by HK UUID and by start date when the UUID is
+           missing, distinct start dates staying separate, non-functional-
+           strength activities excluded, field-preserving mapping, empty input,
+           `HealthImporter` returning mapped workouts + body weight, nil body
+           weight when absent, `limit` respected, and reader-thrown errors
+           propagating. Package `swift test`: 95 XCTest + 35 Swift Testing, 0
+           failures. `xcodebuild -scheme Spottersaurus -destination
+           'platform=iOS Simulator,name=iPhone 17' build`: BUILD SUCCEEDED.
+           `-only-testing:SpottersaurusTests`: TEST SUCCEEDED (19 cases,
+           unchanged — the pure mapping lives entirely in the package). -->
 - [ ] **H3 — Health sync service (`lastSyncedAt` + status)** (TDD-light)
       An `@Observable @MainActor` service tying H1 (auth) + H2 (import): `sync()` async
       that authorizes, imports, persists, stamps `lastSyncedAt`, exposes a status
