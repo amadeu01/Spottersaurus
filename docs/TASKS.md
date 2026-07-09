@@ -204,11 +204,24 @@ Grill decision: real motion/HR pipeline is primary; move manual +rep/flag behind
 `DEBUG` dev panel; **`rackIt` stays always-available** (safety bail). Surface live
 pipeline telemetry so it's not a black box.
 
-- [ ] **E1 — Gate manual controls behind DEBUG dev panel** (Watch UI)
+- [x] **E1 — Gate manual controls behind DEBUG dev panel** (Watch UI) (2026-07-09)
       In `LiveSetControlsView`, keep only Arm/Rack (+ always-visible `rackIt` bail) for
       release; move `completeRep`/`flagGrinding` into a `#if DEBUG` hidden dev panel
       (e.g. long-press to reveal). Auto-detection drives reps in release. Done-when:
       release build hides manual rep/flag; DEBUG shows them; `rackIt` always present.
+      <!-- `.armed`/`.repping` now always renders a prominent alert-tinted
+           "RACK IT" bail (hand.raised.fill, 44pt) above the existing "Rack"
+           button — never gated. `completeRep`/`flagGrinding` moved into a
+           `#if DEBUG`-only collapsed "DEBUG panel" disclosure (tap to reveal,
+           starts hidden) so a Release build never shows manual rep/grind
+           taps; auto-detection is the only rep source there. Added 3
+           `#Preview`s (idle/armed/resting). Verified both
+           `xcodebuild -scheme 'Spottersaurus Watch App' -configuration
+           Debug|Release -destination 'generic/platform=watchOS Simulator'
+           build` succeed with the `#if DEBUG` compiling both ways; package
+           `swift test` unaffected (84 XCTest + 25 Swift Testing, 0
+           failures). No Watch test target exists, per Block E scope this is
+           Watch-UI-only. -->
 - [ ] **E2 — Live pipeline telemetry readout** (Watch UI, `#Preview`)
       Small readout: sensor running?, samples/sec, HR flowing?, last-sample age — from
       the live coordinator/view model. `#Preview` with seeded telemetry. Done-when:
