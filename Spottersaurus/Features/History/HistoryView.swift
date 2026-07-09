@@ -6,19 +6,19 @@ struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var sessions: [WorkoutSession]
 
-    private let viewModel = HistoryViewModel()
+    @State private var viewModel = HistoryViewModel()
 
     var body: some View {
         NavigationStack {
             List {
-                if sessions.isEmpty {
+                if viewModel.sessions.isEmpty {
                     ContentUnavailableView(
                         "No Sessions",
                         systemImage: "clock.arrow.circlepath",
                         description: Text("Finished Watch sessions will land here.")
                     )
                 } else {
-                    ForEach(viewModel.sortedSessions(sessions)) { session in
+                    ForEach(viewModel.sessions) { session in
                         NavigationLink {
                             SessionDetailView(session: session)
                         } label: {
@@ -28,6 +28,9 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .onChange(of: sessions, initial: true) { _, newValue in
+                viewModel.update(with: newValue)
+            }
             .refreshable {
                 viewModel.refreshSavedSessionCount(in: modelContext)
             }

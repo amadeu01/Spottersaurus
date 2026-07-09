@@ -256,11 +256,34 @@ Grill decision: convert list VMs to `@Observable` classes owning derived state,
 `.onChange`, preserving CloudKit reactivity while making VMs testable. Remove the
 no-op `.refreshable`. Add `#Preview` everywhere.
 
-- [ ] **F1 — `HistoryViewModel` → @Observable hybrid** (TDD)
+- [x] **F1 — `HistoryViewModel` → @Observable hybrid** (TDD) (2026-07-09)
       Convert to `@Observable final class`; it accepts `[WorkoutSession]` and exposes
       sorted/derived output. `HistoryView` keeps `@Query`, feeds the VM via
       `.onChange(of: sessions)` + initial load. Test derived ordering/summary output.
       Done-when: test green, list still updates on data change.
+      <!-- `HistoryViewModel` is now a `@MainActor @Observable final class` owning
+           `private(set) var sessions: [WorkoutSession]`, populated only via
+           `update(with:)` (sorts newest-first). All prior pure formatting helpers
+           (sessionTitle/Subtitle, setTitle/Subtitle, velocitySummary, orderedSets)
+           kept as methods, unchanged behavior; `refreshSavedSessionCount` left in
+           place per F5. `HistoryView` now holds `@State private var viewModel =
+           HistoryViewModel()`, keeps its `@Query private var sessions`, and feeds
+           the VM via `.onChange(of: sessions, initial: true)`; rendering reads
+           from `viewModel.sessions`, so the list still updates live on
+           SwiftData/CloudKit changes. `HistorySessionRowView`/`SessionDetailView`/
+           `SessionSummaryCardView`/`CompletedSetDetailCardView` needed no changes
+           (still take/call the VM). TDD: an app-target test target
+           (`SpottersaurusTests`, Swift Testing, `PBXFileSystemSynchronizedRootGroup`
+           — confirmed it can `@testable import Spottersaurus` and already had a
+           working placeholder test) exists, so no package-function detour was
+           needed; new `SpottersaurusTests/HistoryViewModelTests.swift` (5 tests)
+           covers newest-first ordering, `update` replacing prior derived state,
+           and title/subtitle/velocity formatting (built from the same
+           `.formatted` calls to stay locale-agnostic, since the sim run under a
+           comma-decimal locale). Package `swift test`: 84 XCTest + 35 Swift
+           Testing, 0 failures (unaffected — History lives in the app target).
+           `xcodebuild -scheme Spottersaurus -destination 'platform=iOS Simulator,
+           name=iPhone 17' build`: BUILD SUCCEEDED. -->
 - [ ] **F2 — `AnalyticsViewModel` → @Observable hybrid** (TDD)
       Same pattern; fold the throwaway `HistoryViewModel()` usage out. Test the
       derived analytics inputs. Done-when: test green, charts still render.
