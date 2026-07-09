@@ -11,6 +11,7 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     private let liveTickKey = "liveTick"
     private let commandKey = "watchCommand"
     private let finishedSessionKey = "finishedSession"
+    private let lifecycleKey = "liveSetLifecycle"
     private let defaultsKey = "Spottersaurus.lastPlannedSession"
     private let lock = NSLock()
     private let encoder: JSONEncoder
@@ -36,6 +37,19 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     private(set) var isReachable = false
     private(set) var activationState = 0
 
+    /// Pure cursor over the most recently received `PlannedSessionEnvelope`'s
+    /// ordered sets (`PlannedSessionCursor`, SpottersaurusKit). This is the
+    /// M1b fix for the "everything is bench" bug: `currentPlannedSet()` used
+    /// to read only `firstSet` and fall back to a hardcoded bench @ 100 kg
+    /// when nothing had been received. `nil` means "no planned session has
+    /// ever arrived" — the honest empty state `WatchRootView` renders
+    /// instead of a fabricated set. Once a session lands, advancing past its
+    /// last set makes `cursor.isFinished` true (session complete) — still
+    /// not `nil`. `@Observable` via this class so `WatchRootView` re-renders
+    /// reactively as sets progress, mirroring `isReachable`/`activationState`
+    /// above.
+    private(set) var cursor: PlannedSessionCursor?
+
     /// Pure projection of the flags above via the shared `ConnectionStatus`
     /// reducer (see the doc comment on `isReachable` for the watchOS
     /// isPaired/isWatchAppInstalled assumption).
@@ -60,6 +74,7 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
            let envelope = try? decoder.decode(PlannedSessionEnvelope.self, from: data) {
             self.plannedSession = envelope
+            self.cursor = PlannedSessionCursor(session: envelope)
         }
 
         if WCSession.isSupported() {
@@ -75,18 +90,25 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         }
     }
 
-    func currentPlannedSet() -> PlannedSetEnvelope {
-        lock.lock()
-        let set = plannedSession?.firstSet
-        lock.unlock()
+    /// The set currently up in the Live Session, or `nil` when no planned
+    /// session has ever been received — no bench/weight fallback (see
+    /// `cursor`'s doc comment). `WatchRootView` renders an honest empty state
+    /// on `nil` instead of fabricating a set.
+    func currentPlannedSet() -> PlannedSetEnvelope? {
+        cursor?.current
+    }
 
-        return set ?? PlannedSetEnvelope(
-            lift: .bench,
-            exerciseName: "Bench Press",
-            targetReps: 5,
-            weightKg: 100,
-            restSeconds: 90
-        )
+    /// Advances the cursor to the next set once the current one has been
+    /// racked and its rest has fully elapsed — see `WatchRootView`'s
+    /// `onSetSessionComplete`. This only moves which prescription is "up
+    /// next"; it never arms/starts anything (manual re-arm is still
+    /// required, per M1b's safety posture). Safe to call repeatedly past the
+    /// last set — the cursor itself clamps at `setCount`.
+    func advanceCursor() {
+        guard var advanced = cursor else { return }
+        advanced.advance()
+        cursor = advanced
+        logger.notice(.watchLink, "advanced planned session cursor to setIndex=\(advanced.setIndex) of \(advanced.setCount)")
     }
 
     func send(liveTick: LiveTickEnvelope) {
@@ -110,6 +132,34 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
             self?.markLiveTickDelivered()
         } errorHandler: { [weak self] error in
             self?.markLiveTickFailed(error)
+        }
+    }
+
+    /// Emits a Live Set Lifecycle Event (`armed`/`ended` — ADR 0001 +
+    /// `LiveSetLifecycleEnvelope`) to the iPhone as a KEYED message/userInfo
+    /// payload, deliberately never `sendMessageData`: the iPhone's existing
+    /// `WatchLink.session(_:didReceiveMessageData:)` decodes bare
+    /// `LiveTickEnvelope`s with no key, so a raw lifecycle send there would
+    /// risk being mis-decoded as a tick. The iPhone receiver for
+    /// `lifecycleKey` lands in L3; until then this is harmless —
+    /// `WatchLink.session(_:didReceiveMessage:)` simply finds no matching
+    /// key and no-ops.
+    func send(lifecycle event: LiveSetLifecycleEnvelope) {
+        guard let session, let data = try? encoder.encode(event) else {
+            logger.error(.watchLink, "lifecycle event encode/send unavailable")
+            return
+        }
+
+        let payload = [lifecycleKey: data]
+        if session.isReachable {
+            logger.notice(.watchLink, "sending live set lifecycle event via reachable message")
+            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+                self?.logger.warning(.watchLink, "lifecycle event message failed; queueing userInfo: \(error.localizedDescription)")
+                session.transferUserInfo(payload)
+            }
+        } else {
+            logger.notice(.watchLink, "queueing live set lifecycle event userInfo (phone unreachable)")
+            session.transferUserInfo(payload)
         }
     }
 
@@ -214,6 +264,14 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         if let encoded = try? encoder.encode(envelope) {
             UserDefaults.standard.set(encoded, forKey: defaultsKey)
         }
+
+        // A freshly received session always restarts the cursor at set 1 —
+        // this is a new day's plan (or an edited Session Override resend),
+        // not a resume of wherever the previous one left off.
+        let freshCursor = PlannedSessionCursor(session: envelope)
+        Task { @MainActor in
+            self.cursor = freshCursor
+        }
     }
 
     private func queueFinishedSession(_ data: Data, through session: WCSession) {
@@ -235,4 +293,14 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         lock.unlock()
         logger.warning(.watchLink, "live tick send failed: \(error.localizedDescription)")
     }
+
+    #if DEBUG
+    /// Preview/test-only seam: seeds the cursor directly, bypassing the
+    /// `WCSession` decode round-trip, so `#Preview`s can render "no
+    /// session" / "next set ready" / "mid-session" states deterministically
+    /// without a live phone connection. No production call site.
+    func debugSeedCursor(_ cursor: PlannedSessionCursor?) {
+        self.cursor = cursor
+    }
+    #endif
 }

@@ -20,10 +20,38 @@ struct LiveSetView: View {
     @State private var telemetryNow = Date()
     @FocusState private var crownFocused: Bool
 
-    init(plannedSet: PlannedSetEnvelope) {
-        _viewModel = State(initialValue: LiveSetViewModel(plannedSet: plannedSet))
+    /// This set's zero-based position and the day's total set count — the
+    /// "N"/"M" in "Set N of M" (Phase 0.2 M1b). `WatchRootView` recreates
+    /// this view (via `.id(current.id)`) whenever the cursor moves to a
+    /// different set, so these are safe to treat as fixed for this view's
+    /// lifetime.
+    let setIndex: Int
+    let setCount: Int
+    /// The set queued up after this one, if any — shown via
+    /// `NextSetPreviewView` during rest so re-arming is a one-tap start.
+    /// `nil` on the last set of the day.
+    let nextSet: PlannedSetEnvelope?
+    /// Called once this set has been racked AND its rest has fully elapsed
+    /// (i.e. `viewModel.state == .complete`). `WatchRootView` wires this to
+    /// `WatchDependencies.advanceSessionCursor`. Never fires on rack alone —
+    /// only once the rest clock is actually done, matching the existing
+    /// `.complete` gate that already allows re-arming.
+    var onSetSessionComplete: () -> Void = {}
+
+    init(
+        plannedSet: PlannedSetEnvelope,
+        setIndex: Int = 0,
+        setCount: Int = 1,
+        nextSet: PlannedSetEnvelope? = nil,
+        onSetSessionComplete: @escaping () -> Void = {}
+    ) {
+        _viewModel = State(initialValue: LiveSetViewModel(plannedSet: plannedSet, setIndex: setIndex, setCount: setCount))
         _crownMode = State(initialValue: .load)
         _crownValue = State(initialValue: plannedSet.weightKg)
+        self.setIndex = setIndex
+        self.setCount = setCount
+        self.nextSet = nextSet
+        self.onSetSessionComplete = onSetSessionComplete
     }
 
     var body: some View {
@@ -38,7 +66,11 @@ struct LiveSetView: View {
             } else {
                 ScrollView {
                     VStack(spacing: Theme.Spacing.sm) {
-                        PhoneConnectionChip(status: sessionStore.connectionStatus)
+                        HStack(spacing: Theme.Spacing.xs) {
+                            PhoneConnectionChip(status: sessionStore.connectionStatus)
+                            Spacer(minLength: Theme.Spacing.xs)
+                            SetPositionBadgeView(setIndex: setIndex, setCount: setCount)
+                        }
                         LiveSetHeaderView(
                             exerciseName: viewModel.exerciseName,
                             statusText: viewModel.statusText,
@@ -66,6 +98,9 @@ struct LiveSetView: View {
                             restText: viewModel.restText,
                             targetReps: viewModel.targetRepsText
                         )
+                        if let nextSet, viewModel.state == .racked || viewModel.state == .resting {
+                            NextSetPreviewView(nextSet: nextSet)
+                        }
                         if viewModel.state == .idle || viewModel.state == .complete {
                             LiveSetCrownModeControlView(
                                 mode: crownMode,
@@ -112,6 +147,7 @@ struct LiveSetView: View {
                                 sessionCoordinator.stop(logger: dependencies.logger)
                                 sendFinishedSessionIfAvailable()
                                 restStartedAt = nil
+                                onSetSessionComplete()
                             }
                         )
                     }
@@ -155,6 +191,7 @@ struct LiveSetView: View {
                 feedback.playRestCompleteCue()
                 sendFinishedSessionIfAvailable()
                 self.restStartedAt = nil
+                onSetSessionComplete()
             }
         }
         .onAppear {
@@ -185,6 +222,15 @@ struct LiveSetView: View {
     private func startWorkout() {
         sessionCoordinator.stop(logger: dependencies.logger)
         viewModel.arm(logger: dependencies.logger)
+        dependencies.sendLifecycle(
+            .armed(
+                lift: viewModel.lift,
+                targetReps: viewModel.targetReps,
+                weightKg: viewModel.weightKg,
+                setIndex: setIndex,
+                setCount: setCount
+            )
+        )
         sessionCoordinator.start(
             viewModel: viewModel,
             logger: dependencies.logger,

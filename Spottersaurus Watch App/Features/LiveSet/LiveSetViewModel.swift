@@ -12,6 +12,15 @@ final class LiveSetViewModel {
     var velocityMS: Double
     var restElapsed: TimeInterval
 
+    /// This set's zero-based position and the day's total set count within
+    /// the Live Session — the "N"/"M" in "Set N of M" (Phase 0.2 M1b). Set
+    /// once at construction by `LiveSetView` (which is itself recreated per
+    /// set via `.id(current.id)` when the cursor advances), and mirrored
+    /// onto every `liveTickEnvelope` so the iPhone mirror shows day
+    /// progression, not just per-set state.
+    let setIndex: Int
+    let setCount: Int
+
     /// Current HealthKit heart-rate read-authorization status. Refreshed by
     /// `WatchLiveSessionCoordinator` (on screen appear and after each session
     /// start) via `refreshHRAuthStatus(using:)` below — deliberately
@@ -41,13 +50,21 @@ final class LiveSetViewModel {
     private var spotEngine: SpotEngine
     private let targetWarmupReps = 3
 
-    init(plannedSet: PlannedSetEnvelope, heartRate: Int = 132, velocityMS: Double = 0.42) {
+    init(
+        plannedSet: PlannedSetEnvelope,
+        setIndex: Int = 0,
+        setCount: Int = 1,
+        heartRate: Int = 132,
+        velocityMS: Double = 0.42
+    ) {
         let fallbackCalibration = CalibrationValues.fallback(for: plannedSet.lift)
 
         self.exerciseName = plannedSet.exerciseName
         self.lift = plannedSet.lift
         self.targetReps = plannedSet.targetReps
         self.weightKg = plannedSet.weightKg
+        self.setIndex = setIndex
+        self.setCount = setCount
         self.heartRate = heartRate
         self.velocityMS = velocityMS
         self.restElapsed = 0
@@ -132,7 +149,10 @@ final class LiveSetViewModel {
             repCount: repCount,
             currentVelocityMS: velocityMS,
             heartRateBPM: Double(heartRate),
-            elapsedSeconds: setStartedAt.map { max(Date().timeIntervalSince($0), 0) } ?? 0
+            elapsedSeconds: setStartedAt.map { max(Date().timeIntervalSince($0), 0) } ?? 0,
+            alertStage: alertStage,
+            setIndex: setIndex,
+            setCount: setCount
         )
     }
 
