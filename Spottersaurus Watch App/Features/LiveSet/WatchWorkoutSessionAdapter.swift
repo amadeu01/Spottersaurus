@@ -5,6 +5,7 @@ import SpottersaurusKit
 @MainActor
 final class WatchWorkoutSessionAdapter: NSObject, HKLiveWorkoutBuilderDelegate, HKWorkoutSessionDelegate {
     private let healthStore = HKHealthStore()
+    private let authorizer: any HealthKitAuthorizing
     private var session: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
     private var startedAt: Date?
@@ -12,6 +13,11 @@ final class WatchWorkoutSessionAdapter: NSObject, HKLiveWorkoutBuilderDelegate, 
     private var didBeginCollection = false
     private var onHeartRate: ((HRSample) -> Void)?
     private var logger: (any AppLogger)?
+
+    init(authorizer: any HealthKitAuthorizing = HealthKitAuthorizer()) {
+        self.authorizer = authorizer
+        super.init()
+    }
 
     var isRunning: Bool {
         session != nil
@@ -25,6 +31,22 @@ final class WatchWorkoutSessionAdapter: NSObject, HKLiveWorkoutBuilderDelegate, 
 
         self.logger = logger
         self.onHeartRate = onHeartRate
+
+        // Ask-once, gated by the authorizer itself (HealthKitAuthorizer
+        // persists the gate across launches) — safe to call unconditionally
+        // on every arm. Must happen before startActivity/beginCollection so
+        // HR flows and the finished workout is authorized to write back to
+        // Apple Health. A denied or throwing request must never abort the
+        // set: the manual/dev fallback (no HR, nothing written to Health)
+        // keeps working either way.
+        do {
+            try await authorizer.requestAuthorization()
+            let status = await authorizer.authorizationStatusForHeartRate()
+            logger.info(.workout, "HealthKit authorization requested; heartRate status=\(status)")
+        } catch {
+            logger.warning(.workout, "HealthKit authorization request failed: \(error.localizedDescription); continuing without guaranteed HR/write access")
+        }
+
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .functionalStrengthTraining
         configuration.locationType = .indoor

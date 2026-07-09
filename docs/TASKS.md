@@ -108,12 +108,28 @@ on **first arm**, asked once. No auth today → HR empty + nothing written to Ap
            throwing/denied request still lets the caller proceed without
            re-attempting on a later arm. Not wired into
            `WatchWorkoutSessionAdapter` yet (C2). -->
-- [ ] **C2 — Request auth on first arm** (TDD-light + on-device note)
+- [x] **C2 — Request auth on first arm** (TDD-light + on-device note) (2026-07-09)
       In `WatchWorkoutSessionAdapter.start`, call the authorizer **before**
       `beginCollection`, gated so it prompts once. Log outcome under `.workout`.
       Test: fake authorizer is invoked once across two arms; start still proceeds when
       denied (existing manual fallback). Done-when: tests green; leave an on-device
       verify checkbox.
+      <!-- `WatchWorkoutSessionAdapter` now takes an injected `authorizer: any
+           HealthKitAuthorizing` (default `HealthKitAuthorizer()`); `start(...)`
+           awaits `authorizer.requestAuthorization()` + logs the resulting
+           `authorizationStatusForHeartRate()` under `.workout` before building
+           the `HKWorkoutConfiguration`/`startActivity`/`beginCollection`. A
+           throw is caught and logged as a warning, never aborts the set —
+           manual/dev fallback keeps working. No new gate added; the existing
+           `HealthKitAuthorizer` ask-once (UserDefaults-backed) gate is reused
+           as-is per C1. No Watch test target exists (confirmed again), so the
+           gate/no-double-request/proceed-on-deny behavior is covered by the
+           package-level `HealthKitAuthorizingTests` (C1, unchanged, still
+           green) rather than a new Watch-target XCTest.
+           [ ] ON-DEVICE VERIFY: pair a real Watch and confirm the system
+           HealthKit prompt actually appears on first arm, HR reads flow into
+           the live set, and the finished workout lands in Apple Health
+           (Simulator cannot show or authorize the real HK permission sheet). -->
 - [ ] **C3 — Surface auth state on Watch** (Watch UI, `#Preview`)
       Show a compact indicator when HR auth is denied/undetermined so the user knows
       why HR is blank. `#Preview` the states. Done-when: builds, preview renders.

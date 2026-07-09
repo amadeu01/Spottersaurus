@@ -9,8 +9,8 @@
 //  test the "ask once" gate live in `SpottersaurusKit`
 //  (`HealthKit/HealthKitAuthorizing.swift`); this type is exercised on-device.
 //
-//  Not wired into `WatchWorkoutSessionAdapter` yet — that's a follow-up task
-//  (call this before `beginCollection` on first arm).
+//  Wired into `WatchWorkoutSessionAdapter.start(...)` as the default
+//  `authorizer`, called before `startActivity`/`beginCollection` on first arm.
 //
 
 import Foundation
