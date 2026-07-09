@@ -492,7 +492,7 @@ in parallel with the rest. Review each subagent commit before dispatching depend
            the iPhone scheme (not the Watch scheme). -->
 
 ### Block R — Move the live-tick card off Review
-- [ ] **R1 — Remove `LiveWatchStatusCardView` from `ReviewView`** (iOS UI)
+- [x] **R1 — Remove `LiveWatchStatusCardView` from `ReviewView`** (iOS UI) (2026-07-09)
       Review becomes just the History/Analytics segmented picker. Drop the card +
       the now-unused `watchMonitor` wiring in `ReviewView` if nothing else needs it.
       Keep the `#Preview`. Done-when: builds, Review shows no live card.
