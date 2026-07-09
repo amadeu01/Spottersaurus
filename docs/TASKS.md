@@ -744,10 +744,20 @@ in parallel with the rest. Review each subagent commit before dispatching depend
       Alert-Stage/rest, freeze pulsing borders + velocity churn + telemetry.
       RACK IT stays haptic/audio (unchanged). `#Preview` luminance-reduced.
       Done-when: builds, AOD variant renders calm/static.
-- [ ] **V2 — Mean Concentric Velocity readout crispness** (Watch UI) — independent
+- [x] **V2 — Mean Concentric Velocity readout crispness** (Watch UI) — independent
       Ensure the Watch surfaces the per-rep Mean Concentric Velocity clearly at
       rep completion (label it, `.monospacedDigit()`, no stale/flicker between
       reps). Small; verify against `LiveSetViewModel.velocityMS` = `rep.meanVelocityMS`.
+      (2026-07-09)
+      <!-- Label "VEL"/unit "m/s"/`.monospacedDigit()` were already correct
+           (LiveSetMetricTile applies monospacedDigit to all tile values). Only
+           gap: the VEL tile showed velocityMS's 0.42 placeholder default before
+           any rep completed, reading as a real measurement. Added
+           `LiveSetViewModel.displayVelocityMS` (nil until repCount > 0) and
+           threaded Optional through LiveSetMetricsGridView/frozenVelocityMS so
+           the tile reads "--" pre-first-rep, matching the app's existing "--"
+           empty-metric convention (see restText). V1's AOD freeze behavior
+           preserved. -->
 
 ### Phase 0.2 — dependency order for dispatch
 `L1 → L2`, `L1 → L3`, `L1 → M1` · `M2` after `M1` · `S1`/`R3`/`S2` after `L3` ·

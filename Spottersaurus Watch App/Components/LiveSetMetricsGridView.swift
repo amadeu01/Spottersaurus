@@ -2,7 +2,10 @@ import SwiftUI
 import SpottersaurusKit
 
 struct LiveSetMetricsGridView: View {
-    var velocityMS: Double
+    /// The last completed rep's Mean Concentric Velocity (Phase 0.2 V2). `nil`
+    /// before the set's first rep completes — there's no reading yet, so the
+    /// tile shows "--" rather than a placeholder number.
+    var velocityMS: Double?
     var heartRate: Int
     var weightKg: Double
     var restText: String
@@ -15,14 +18,18 @@ struct LiveSetMetricsGridView: View {
     /// screen was fully lit rather than tracking live updates while dimmed —
     /// same tile, same layout, just static.
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
-    @State private var frozenVelocityMS: Double = 0
+    @State private var frozenVelocityMS: Double?
+
+    private var displayedVelocityMS: Double? {
+        isLuminanceReduced ? frozenVelocityMS : velocityMS
+    }
 
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             HStack(spacing: Theme.Spacing.sm) {
                 LiveSetMetricTile(
                     label: "VEL",
-                    value: String(format: "%.2f", isLuminanceReduced ? frozenVelocityMS : velocityMS),
+                    value: displayedVelocityMS.map { String(format: "%.2f", $0) } ?? "--",
                     unit: "m/s"
                 )
                 LiveSetMetricTile(label: "HR", value: "\(heartRate)", unit: "bpm")
@@ -66,4 +73,16 @@ struct LiveSetMetricsGridView: View {
     .padding()
     .background(Theme.Colors.canvas)
     .environment(\.isLuminanceReduced, true)
+}
+
+#Preview("No reading yet") {
+    LiveSetMetricsGridView(
+        velocityMS: nil,
+        heartRate: 0,
+        weightKg: 100,
+        restText: "--",
+        targetReps: "0 of 5"
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
 }

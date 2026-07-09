@@ -103,7 +103,7 @@ struct LiveSetView: View {
                             alertStage: viewModel.alertStage
                         )
                         LiveSetMetricsGridView(
-                            velocityMS: viewModel.velocityMS,
+                            velocityMS: viewModel.displayVelocityMS,
                             heartRate: viewModel.heartRate,
                             weightKg: viewModel.weightKg,
                             restText: viewModel.restText,

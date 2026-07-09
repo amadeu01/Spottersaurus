@@ -85,6 +85,14 @@ final class LiveSetViewModel {
         lifecycle.repCount
     }
 
+    /// The VEL tile's Mean Concentric Velocity (Phase 0.2 V2): `nil` until the
+    /// first rep of the set actually completes (auto-detected or manually
+    /// confirmed via `completeRep()`), so the readout can show an honest "--"
+    /// instead of `velocityMS`'s placeholder default before any rep exists.
+    var displayVelocityMS: Double? {
+        repCount > 0 ? velocityMS : nil
+    }
+
     var isRackItOverlayVisible: Bool {
         lifecycle.alertStage == .rackIt
     }
