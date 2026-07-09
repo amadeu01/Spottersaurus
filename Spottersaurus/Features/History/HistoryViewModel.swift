@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import SwiftData
 import SpottersaurusKit
 
 /// Owns the derived (sorted) session list History renders. `HistoryView` keeps
@@ -54,11 +53,5 @@ final class HistoryViewModel {
         let average = set.avgConcentricVelocityMS.formatted(.number.precision(.fractionLength(2)))
         let peak = set.peakConcentricVelocityMS.formatted(.number.precision(.fractionLength(2)))
         return "\(average) avg / \(peak) peak"
-    }
-
-    func refreshSavedSessionCount(in modelContext: ModelContext, logger: any AppLogger = LoggerGroup.iPhone) {
-        let descriptor = FetchDescriptor<WorkoutSession>()
-        let count = (try? modelContext.fetchCount(descriptor)) ?? 0
-        logger.info(.persistence, "history refresh savedSessionCount=\(count)")
     }
 }

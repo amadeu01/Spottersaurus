@@ -369,10 +369,25 @@ no-op `.refreshable`. Add `#Preview` everywhere.
            tests (`-only-testing:SpottersaurusTests`): 19 tests, 0 failures.
            `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
            Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
-- [ ] **F5 — Remove no-op `.refreshable`** (fixes #8 by deletion)
+- [x] **F5 — Remove no-op `.refreshable`** (fixes #8 by deletion) (2026-07-09)
       Delete `.refreshable` from `HistoryView` + `AnalyticsView` (data is live via
       `@Query`); drop the now-unused `refreshSavedSessionCount` if nothing else calls
       it. Done-when: builds, no pull-to-refresh jank, no dead code.
+      <!-- `AnalyticsView` was already clean (F2 removed its `.refreshable`/throwaway
+           VM call). Removed `HistoryView`'s `.refreshable { viewModel
+           .refreshSavedSessionCount(in: modelContext) }` and the now-unused
+           `@Environment(\.modelContext)` (nothing else in the view read it). Grepped
+           the whole repo for `refreshSavedSessionCount`: only the
+           `HistoryViewModel` definition and that one call site existed, so deleted
+           the method too, then dropped the now-unused `import SwiftData` from
+           `HistoryViewModel.swift` (it only imported it for `ModelContext`/
+           `FetchDescriptor`, both gone). `@Query` reactivity is unchanged and
+           remains the sole live-update mechanism for both screens. Package
+           `swift test`: 84 XCTest + 35 Swift Testing, 0 failures. App-target tests
+           (`-only-testing:SpottersaurusTests`): 19 tests, 0 failures (no test
+           referenced the removed method). `xcodebuild -scheme Spottersaurus
+           -destination 'platform=iOS Simulator,name=iPhone 17' build`: BUILD
+           SUCCEEDED. -->
 - [ ] **F6 — `#Preview` sweep (iPhone)**
       Add `#Preview` (using `makeModelContainer(inMemory:true)` + minimal seed) to
       Today, Programs, ProgramDetail, builders, Maxes, Review, SessionDetail, and the

@@ -3,7 +3,6 @@ import SwiftUI
 import SpottersaurusKit
 
 struct HistoryView: View {
-    @Environment(\.modelContext) private var modelContext
     @Query private var sessions: [WorkoutSession]
 
     @State private var viewModel = HistoryViewModel()
@@ -30,9 +29,6 @@ struct HistoryView: View {
             .navigationTitle("History")
             .onChange(of: sessions, initial: true) { _, newValue in
                 viewModel.update(with: newValue)
-            }
-            .refreshable {
-                viewModel.refreshSavedSessionCount(in: modelContext)
             }
         }
     }
