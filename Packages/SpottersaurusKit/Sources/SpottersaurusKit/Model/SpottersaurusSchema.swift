@@ -30,6 +30,7 @@ public enum SpottersaurusSchema {
             UserMaxes.self,
             CalibrationProfile.self,
             SpotterPairing.self,
+            BodyWeightEntry.self,
         ]
     }
 

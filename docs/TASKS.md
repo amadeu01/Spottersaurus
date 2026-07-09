@@ -607,6 +607,117 @@ in parallel with the rest. Review each subagent commit before dispatching depend
 
 ---
 
+## Phase 0.2 — Live Session Surfaces & Multi-Set Execution
+
+> Inserted 2026-07-09 from a `/grill-with-docs` session. Origin: user wants an
+> Apple-Fitness-style experience — the iPhone changes to an in-workout screen
+> when a set starts, a lock-screen Live Activity shows glanceable stats, and
+> velocity feels real-time; the Watch↔iPhone mirror has a visible delay. Also
+> surfaced: the Watch only ever runs the FIRST set of the day and falls back to
+> a hardcoded bench @ 100 kg, so "everything is bench / same load". Decisions +
+> constraints recorded in **`docs/adr/0001-live-session-surfaces-and-transport.md`**
+> and the new glossary terms in `CONTEXT.md` (Live Session, In-Workout View,
+> Session Override, Mean Concentric Velocity, Live Set Lifecycle Event).
+>
+> **Grill decisions (2026-07-09):**
+> - Watch = the real-time instrument; iPhone + lock screen are glanceable, low-freq.
+> - Velocity metric = **Mean Concentric Velocity per rep**, shown at rep completion.
+> - Add explicit **Live Set Lifecycle Events** (`armed`/`ended`) to the stream.
+> - Foreground transport = **coalesce-to-latest** (never drop the freshest tick).
+> - Live Activity **starts foreground** (on Send-to-Watch); updates via
+>   `activity.update` when reachable + opportunistic `transferUserInfo`
+>   background-wakes; elapsed/rest via `Text(timerInterval:)`. **No APNs server
+>   in v1.0.0** → few-second staleness while locked is accepted.
+> - iPhone In-Workout View = app-wide, **dismissible** full-screen takeover,
+>   lifecycle-managed. Replaces R3's "expand during a set" role.
+> - Dynamic Island: **reps + Alert-Stage color** in compact/minimal; full metrics
+>   in expanded + lock-screen card.
+> - Watch AOD: calm static variant via `isLuminanceReduced`; alarm stays
+>   haptic/audio (no forced full-brightness).
+> - Live Session lifetime is **session-scoped** (spans sets + rests), 5-min
+>   staleness timeout.
+> - Multi-set: Watch runs the whole day, **manual arm per set**, next set shown
+>   during rest; replace the bench-100 fallback with an honest "no session" state.
+> - iPhone edit = ephemeral **Session Override** (does not mutate the Program).
+>
+> **Execution rules** (same as Phase 0): one Sonnet 5 subagent per task, TDD
+> where logic is pure, `#Preview` + build-green for UI, one task = one commit,
+> orchestrator reviews each commit before dispatching dependents.
+
+### Block L — Live-session foundation (stream + transport + phone state)
+- [ ] **L1 — Live Set Lifecycle Events** (TDD, package)
+      Add `armed`(lift/target reps/weight/set index/set count) and `ended` signals
+      to the Watch→phone stream (extend the envelope set in `Sync/`). Ticks carry
+      running metrics + current Alert Stage + set N-of-M. Pure encode/decode +
+      reducer tests. Done-when: package tests green.
+- [ ] **L2 — Coalesce-to-latest transport** (TDD where pure) — depends on L1
+      Rewrite `WatchPlannedSessionStore.send(liveTick:)`: keep the newest tick,
+      send it when the in-flight send completes (no drop-on-in-flight), rep-
+      completion ticks prioritized, ~2 s heartbeat, remove the 5 s hard backoff
+      (small/adaptive instead). Extract the coalescing decision into a pure,
+      testable type. Done-when: coalescer tests green, Watch builds.
+- [ ] **L3 — `LiveSessionMonitor` (iPhone)** (TDD state machine) — depends on L1
+      Session-scoped state machine (`idle→armed→active↔resting→ended`) fed by
+      lifecycle events + ticks, with the 5-min staleness timeout; replaces the
+      tick-recency heuristic in `PhoneWatchSessionMonitor`. Drives all iPhone
+      surfaces. Test the state machine + timeout with injected time. Done-when:
+      tests green, iOS builds.
+
+### Block M — Multi-set Watch execution (the "everything is bench" fix)
+- [ ] **M1 — Watch runs the whole day, manual arm per set** (TDD pure) — depends on L1
+      Replace `currentPlannedSet()`'s `firstSet`-only + bench-100 fallback: track
+      an ordered set cursor, advance on rack→rest→next (queued, **manual arm**),
+      expose "Set N of M" + next-set prescription during rest. No planned session
+      received → honest "no session sent" empty state, not a fake bench set.
+      Extract the cursor/advancement as a pure Sendable type + tests. Done-when:
+      advancement tests green, Watch builds, emits L1 `armed`/`ended` per session.
+- [ ] **M2 — iPhone Session Override editor + Send** (TDD build, iOS UI) — depends on M1
+      Tap today's session on Today → quick editor (per set: lift, target reps,
+      weight, rest, AMRAP) → Send-to-Watch ships the adjusted
+      `PlannedSessionEnvelope`. Ephemeral (does not mutate the Program). Test the
+      override→envelope construction. `#Preview`. Done-when: tests green, edited
+      session sends, Program unchanged.
+
+### Block S — iPhone live surfaces
+- [ ] **S1 — In-Workout View (app-wide dismissible takeover)** (iOS UI, `#Preview`) — depends on L3
+      Full-screen cover presented from root on `armed`, dismissible with a
+      "return to set" pill, auto-dismissed on session end. Big reps/target,
+      Mean Concentric Velocity, HR, Alert-Stage banner (amber/red tint), rest
+      ring, set N-of-M. `#Preview` idle/active/grinding/rackIt/resting. Done-when:
+      builds, previews render, appears/updates/dismisses off `LiveSessionMonitor`.
+- [ ] **R3 — Today collapsible card (idle/disconnected + reconnect)** (iOS UI, `#Preview`) — depends on L3
+      Reconcile the earlier R3: Today shows a compact card when idle/Watch
+      disconnected, with a reconnect affordance; the "expand during a set" role is
+      handled by S1 (In-Workout View), not this card. `#Preview` states.
+- [ ] **S2 — Live Activity (ActivityKit)** (iOS UI + new Widget Extension target) — depends on L3
+      NEW Widget Extension target (manual Xcode/xcodeproj step — flag like the
+      Watch embed). `ActivityAttributes` = static set identity (lift/target/weight/
+      program-day); `ContentState` = reps/velocity/HR/Alert Stage/set N-of-M.
+      Lock-screen card + Dynamic Island (compact = reps + Alert-Stage tint,
+      minimal = reps, expanded = full metrics). Start foreground on Send-to-Watch;
+      update via `activity.update` on reachable + `transferUserInfo` wakes;
+      elapsed/rest via `Text(timerInterval:)`. `NSSupportsLiveActivitiesFrequent
+      Updates` NOT required (no APNs). `#Preview` the widget states. Done-when:
+      target builds, Activity starts/updates/ends over a real session.
+
+### Block V — Watch always-on + velocity polish
+- [ ] **V1 — Watch Always-On Display variant** (Watch UI, `#Preview`) — independent
+      `isLuminanceReduced`-driven calm variant of `LiveSetView`: static reps/
+      Alert-Stage/rest, freeze pulsing borders + velocity churn + telemetry.
+      RACK IT stays haptic/audio (unchanged). `#Preview` luminance-reduced.
+      Done-when: builds, AOD variant renders calm/static.
+- [ ] **V2 — Mean Concentric Velocity readout crispness** (Watch UI) — independent
+      Ensure the Watch surfaces the per-rep Mean Concentric Velocity clearly at
+      rep completion (label it, `.monospacedDigit()`, no stale/flicker between
+      reps). Small; verify against `LiveSetViewModel.velocityMS` = `rep.meanVelocityMS`.
+
+### Phase 0.2 — dependency order for dispatch
+`L1 → L2`, `L1 → L3`, `L1 → M1` · `M2` after `M1` · `S1`/`R3`/`S2` after `L3` ·
+`V1`/`V2` independent. `S2` needs the new Widget Extension target created first.
+Review each subagent commit before dispatching dependents.
+
+---
+
 ## Phase 1 — Project setup
 - [x] Create `Packages/SpottersaurusKit` local Swift package (Package.swift, iOS+watchOS platforms) (2026-06-29)
 - [x] Package source dirs: `Model/`, `Detection/`, `Sync/`, `Design/`, plus `Tests/` (2026-06-29)

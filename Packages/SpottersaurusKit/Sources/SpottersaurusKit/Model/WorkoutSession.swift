@@ -11,11 +11,14 @@
 import Foundation
 import SwiftData
 
-/// Which device captured a session. The Watch is the in-gym executor; the phone
-/// covers manual / free-form logging.
+/// Which device (or import) captured a session. The Watch is the in-gym
+/// executor; the phone covers manual / free-form logging; `.appleHealth`
+/// marks a lightweight history entry imported read-only from Apple Health
+/// (H3) — no per-rep data, just a date placeholder in history.
 public enum SourceDevice: String, Codable, Sendable, CaseIterable {
     case watch
     case phone
+    case appleHealth
 }
 
 /// A performed workout session.
