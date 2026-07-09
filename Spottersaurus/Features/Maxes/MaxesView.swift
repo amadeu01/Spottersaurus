@@ -18,6 +18,15 @@ struct MaxesView: View {
                 }
             }
             .navigationTitle("Maxes")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        LogViewerView()
+                    } label: {
+                        Label("Debug Logs", systemImage: "ladybug")
+                    }
+                }
+            }
             .onAppear {
                 viewModel.ensureCompetitionMaxesExist(in: modelContext, existingMaxes: maxes)
             }

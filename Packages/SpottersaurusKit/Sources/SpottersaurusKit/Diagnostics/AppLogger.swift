@@ -120,6 +120,12 @@ let spottersaurusSharedLogStore = FileLogStore(
     maxBytes: spottersaurusLogFileMaxBytes
 )
 
+/// Public accessor for the process-wide shared `FileLogStore`, so apps can
+/// read back / export the same NDJSON file their `LoggerGroup` writes to
+/// (e.g. an in-app debug log viewer). The underlying global stays internal;
+/// this is the only sanctioned way to reach it from outside the package.
+public var sharedLogStore: FileLogStore { spottersaurusSharedLogStore }
+
 public extension LoggerGroup {
     static let iPhone = LoggerGroup([
         OSLogLogger(subsystem: "amadeu.dev.Spottersaurus"),
