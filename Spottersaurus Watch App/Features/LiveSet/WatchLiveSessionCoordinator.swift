@@ -20,6 +20,14 @@ final class WatchLiveSessionCoordinator {
         workoutAdapter.isRunning || motionAdapter.isRunning
     }
 
+    /// Motion-adapter-only running state, for `PipelineTelemetryView` — the
+    /// "sensor running?" indicator is specifically about the motion stream
+    /// (squat/bench/deadlift detection), independent of whether the HR
+    /// workout session separately succeeded.
+    var isMotionRunning: Bool {
+        motionAdapter.isRunning
+    }
+
     /// Re-queries HR authorization status and pushes it onto `viewModel` so
     /// `HRAuthIndicatorView` can explain a blank HR readout. Called on the
     /// live-set screen's `onAppear` and again once a session finishes

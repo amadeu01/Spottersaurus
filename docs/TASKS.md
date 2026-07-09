@@ -222,10 +222,33 @@ pipeline telemetry so it's not a black box.
            `swift test` unaffected (84 XCTest + 25 Swift Testing, 0
            failures). No Watch test target exists, per Block E scope this is
            Watch-UI-only. -->
-- [ ] **E2 — Live pipeline telemetry readout** (Watch UI, `#Preview`)
+- [x] **E2 — Live pipeline telemetry readout** (Watch UI, `#Preview`) (2026-07-09)
       Small readout: sensor running?, samples/sec, HR flowing?, last-sample age — from
       the live coordinator/view model. `#Preview` with seeded telemetry. Done-when:
       builds, preview renders, values update while armed.
+      <!-- New `LivePipelineTelemetry` (SpottersaurusKit/Detection) is a pure
+           Sendable/Equatable snapshot + `static func make(motionSampleTimestamps:
+           hrSampleTimestamps:now:sensorRunning:window:hrWindow:)`, TDD'd first
+           (10 Swift Testing cases: rate over trailing window, samples outside
+           the window excluded, nil age with no samples, newest-timestamp age
+           regardless of array order, HR flowing/stale/never-arrived, sensorRunning
+           passthrough, `.idle` default). `LiveSetViewModel` now records wall-clock
+           (not set-relative) motion/HR ingest timestamps in a small trailing
+           buffer (2s retention, trimmed on every ingest) and exposes
+           `telemetry(sensorRunning:now:) -> LivePipelineTelemetry`; sensorRunning
+           itself comes from the caller since the view model doesn't own the
+           motion adapter. `WatchLiveSessionCoordinator` gained `isMotionRunning`
+           (motion-adapter-only, distinct from the combined HR+motion `isRunning`).
+           New `Components/PipelineTelemetryView.swift`: compact single-row
+           capsule (sensor ●/○ + "xx/s", HR ●/○, last-sample age), 3 `#Preview`s
+           (alive/stalled/idle). Wired into `LiveSetView` as a subtle always-on
+           micro-readout shown only while `.armed`/`.repping` (least intrusive —
+           no card, no DEBUG gate, hidden pre-arm/post-rack); a dedicated 1s timer
+           tick (`telemetryNow`) refreshes it so staleness visibly increases even
+           with no new samples. `swift test`: 84 XCTest + 35 Swift Testing (10
+           new), 0 failures. `xcodebuild -scheme 'Spottersaurus Watch App'
+           -destination 'generic/platform=watchOS Simulator' build`: BUILD
+           SUCCEEDED. -->
 
 ### Block F — Architecture + reactivity (#8/#9). Independent of A–E.
 Grill decision: convert list VMs to `@Observable` classes owning derived state,

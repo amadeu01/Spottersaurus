@@ -24,6 +24,16 @@ final class LiveSetViewModel {
     private var warmupMotionSamples: [MotionSample] = []
     private var motionSamples: [MotionSample] = []
     private var heartRateSamples: [HRSample] = []
+
+    /// Wall-clock (not set-relative) ingest timestamps, kept only for the
+    /// `LivePipelineTelemetry` readout so a dev/lifter can tell the pipeline
+    /// is actually alive. Decoupled from `motionSamples`/`heartRateSamples`
+    /// (which use a monotonic clock relative to set arm) because staleness
+    /// must be measured against real elapsed time. Trimmed to a small
+    /// trailing buffer — bounded memory, not a full session history.
+    private var motionIngestTimestamps: [TimeInterval] = []
+    private var hrIngestTimestamps: [TimeInterval] = []
+    private let telemetryBufferRetention: TimeInterval = 2
     private var repMetrics: [RepMetricEnvelope] = []
     private var spotEvents: [SpotEventEnvelope] = []
     private var setStartedAt: Date?
@@ -100,6 +110,21 @@ final class LiveSetViewModel {
         let samples = motionSamples.count + warmupMotionSamples.count
         guard samples > 0 else { return "Motion: waiting" }
         return "Motion: \(samples) samples"
+    }
+
+    /// Live sensor-pipeline health for `PipelineTelemetryView` — proves the
+    /// auto-detection is running off real samples, not mocked. `sensorRunning`
+    /// isn't tracked by this view model (it doesn't own the motion adapter),
+    /// so the caller (typically `WatchLiveSessionCoordinator.isMotionRunning`)
+    /// passes it in; samples/sec, HR-flowing, and staleness are derived here
+    /// from recent wall-clock ingest timestamps.
+    func telemetry(sensorRunning: Bool, now: Date = Date()) -> LivePipelineTelemetry {
+        LivePipelineTelemetry.make(
+            motionSampleTimestamps: motionIngestTimestamps,
+            hrSampleTimestamps: hrIngestTimestamps,
+            now: now.timeIntervalSinceReferenceDate,
+            sensorRunning: sensorRunning
+        )
     }
 
     var liveTickEnvelope: LiveTickEnvelope {
@@ -262,6 +287,8 @@ final class LiveSetViewModel {
     }
 
     func ingestMotionSamples(_ samples: [MotionSample]) {
+        recordMotionIngestTelemetry(count: samples.count)
+
         if calibrationState.isCollecting {
             warmupMotionSamples.append(contentsOf: samples)
             trimWarmupSamples()
@@ -309,6 +336,7 @@ final class LiveSetViewModel {
         heartRateSamples.append(sample)
         heartRate = Int(sample.beatsPerMinute.rounded())
         trimSamples()
+        recordHRIngestTelemetry()
     }
 
     /// Re-queries the HealthKit heart-rate authorization status so the UI can
@@ -354,5 +382,23 @@ final class LiveSetViewModel {
     private func trimWarmupSamples() {
         let floor = (warmupMotionSamples.last?.timestamp ?? 0) - 45
         warmupMotionSamples.removeAll { $0.timestamp < floor }
+    }
+
+    private func recordMotionIngestTelemetry(count: Int) {
+        guard count > 0 else { return }
+        let now = Date().timeIntervalSinceReferenceDate
+        motionIngestTimestamps.append(contentsOf: Array(repeating: now, count: count))
+        trimTelemetryTimestamps()
+    }
+
+    private func recordHRIngestTelemetry() {
+        hrIngestTimestamps.append(Date().timeIntervalSinceReferenceDate)
+        trimTelemetryTimestamps()
+    }
+
+    private func trimTelemetryTimestamps() {
+        let floor = Date().timeIntervalSinceReferenceDate - telemetryBufferRetention
+        motionIngestTimestamps.removeAll { $0 < floor }
+        hrIngestTimestamps.removeAll { $0 < floor }
     }
 }

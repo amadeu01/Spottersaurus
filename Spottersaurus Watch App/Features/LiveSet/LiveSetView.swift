@@ -13,6 +13,11 @@ struct LiveSetView: View {
     @State private var crownValue: Double
     @State private var handledCommandID: UUID?
     @State private var sessionStore = WatchPlannedSessionStore.shared
+    /// Ticks once a second while armed/repping so `PipelineTelemetryView`
+    /// reflects real elapsed staleness even when no new sample has arrived
+    /// (that's the whole point of the readout — a stalled pipeline should
+    /// visibly go stale, not freeze on its last good value).
+    @State private var telemetryNow = Date()
     @FocusState private var crownFocused: Bool
 
     init(plannedSet: PlannedSetEnvelope) {
@@ -42,6 +47,11 @@ struct LiveSetView: View {
                             alertStage: viewModel.alertStage
                         )
                         HRAuthIndicatorView(status: viewModel.hrAuthStatus)
+                        if viewModel.state == .armed || viewModel.state == .repping {
+                            PipelineTelemetryView(
+                                telemetry: viewModel.telemetry(sensorRunning: sessionCoordinator.isMotionRunning, now: telemetryNow)
+                            )
+                        }
                         LiveSetRepGaugeView(
                             repCount: viewModel.repCount,
                             targetReps: viewModel.targetReps,
@@ -135,6 +145,7 @@ struct LiveSetView: View {
             crownFocused = isEnabled
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now in
+            telemetryNow = now
             guard let restStartedAt else { return }
             let completed = viewModel.restTick(
                 elapsed: now.timeIntervalSince(restStartedAt),
