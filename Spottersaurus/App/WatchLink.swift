@@ -8,11 +8,15 @@ final class WatchLink: NSObject, WCSessionDelegate {
     private let payloadKey = "plannedSession"
     private let commandKey = "watchCommand"
     private let finishedSessionKey = "finishedSession"
+    /// Matches `WatchPlannedSessionStore.lifecycleKey` on the Watch side
+    /// exactly ("liveSetLifecycle") — see that file's `send(lifecycle:)`.
+    private let lifecycleKey = "liveSetLifecycle"
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let logger = LoggerGroup.iPhone
     @MainActor private var onFinishedSession: ((SessionEnvelope) -> Void)?
     @MainActor private var onLiveTick: ((LiveTickEnvelope) -> Void)?
+    @MainActor private var onLifecycle: ((LiveSetLifecycleEnvelope) -> Void)?
     private var session: WCSession?
 
     override private init() {
@@ -64,10 +68,12 @@ final class WatchLink: NSObject, WCSessionDelegate {
     @MainActor
     func configure(
         onLiveTick: ((LiveTickEnvelope) -> Void)? = nil,
-        onFinishedSession: ((SessionEnvelope) -> Void)? = nil
+        onFinishedSession: ((SessionEnvelope) -> Void)? = nil,
+        onLifecycle: ((LiveSetLifecycleEnvelope) -> Void)? = nil
     ) {
         self.onLiveTick = onLiveTick
         self.onFinishedSession = onFinishedSession
+        self.onLifecycle = onLifecycle
     }
 
     @MainActor
@@ -197,12 +203,20 @@ final class WatchLink: NSObject, WCSessionDelegate {
             logger.notice(.watchLink, "received finished session live message bytes=\(data.count)")
             receiveFinishedSession(data)
         }
+        if let data = message[lifecycleKey] as? Data {
+            logger.notice(.watchLink, "received live set lifecycle live message bytes=\(data.count)")
+            receiveLifecycle(data)
+        }
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         if let data = userInfo[finishedSessionKey] as? Data {
             logger.notice(.watchLink, "received finished session userInfo bytes=\(data.count)")
             receiveFinishedSession(data)
+        }
+        if let data = userInfo[lifecycleKey] as? Data {
+            logger.notice(.watchLink, "received live set lifecycle userInfo bytes=\(data.count)")
+            receiveLifecycle(data)
         }
     }
 
@@ -214,6 +228,17 @@ final class WatchLink: NSObject, WCSessionDelegate {
         logger.notice(.watchLink, "decoded finished session id=\(envelope.id) sets=\(envelope.sets.count)")
         Task { @MainActor in
             onFinishedSession?(envelope)
+        }
+    }
+
+    private func receiveLifecycle(_ data: Data) {
+        guard let event = try? decoder.decode(LiveSetLifecycleEnvelope.self, from: data) else {
+            logger.error(.watchLink, "failed decoding live set lifecycle event")
+            return
+        }
+        logger.notice(.watchLink, "decoded live set lifecycle event")
+        Task { @MainActor in
+            onLifecycle?(event)
         }
     }
 }

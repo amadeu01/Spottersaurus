@@ -29,6 +29,7 @@ struct PlannerTabsView: View {
             WatchLink.shared.configure(
                 onLiveTick: { tick in
                     PhoneWatchSessionMonitor.shared.receiveLiveTick(tick)
+                    LiveSessionMonitor.shared.receive(tick: tick)
                 },
                 onFinishedSession: { envelope in
                     LoggerGroup.iPhone.notice(.persistence, "importing finished session id=\(envelope.id) sets=\(envelope.sets.count)")
@@ -37,6 +38,9 @@ struct PlannerTabsView: View {
                         PhoneWatchSessionMonitor.shared.recordImport(envelope)
                         LoggerGroup.iPhone.notice(.persistence, "imported workout session id=\(session.id)")
                     }
+                },
+                onLifecycle: { event in
+                    LiveSessionMonitor.shared.receive(lifecycle: event)
                 }
             )
         }
