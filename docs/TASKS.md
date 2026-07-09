@@ -341,8 +341,34 @@ no-op `.refreshable`. Add `#Preview` everywhere.
            tests (`-only-testing:SpottersaurusTests`): 15 tests, 0 failures.
            `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
            Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
-- [ ] **F4 — `ProgramsViewModel` → @Observable hybrid** (TDD)
+- [x] **F4 — `ProgramsViewModel` → @Observable hybrid** (TDD) (2026-07-09)
       Same pattern for Programs list. Test derived output. Done-when: green.
+      <!-- `ProgramsViewModel` is now a `@MainActor @Observable final class`
+           owning `private(set) var programs: [Program]`, populated only via
+           `update(with:)` (sorts newest-first, same as the prior stateless
+           `sortedPrograms(_:)` helper). `loadFiveThreeOne`/
+           `loadLinearProgression`/`createProgram` keep their exact prior
+           signatures/behavior (side effects on `modelContext`, not derived
+           state). `deletePrograms(at:in:)` now indexes into the owned sorted
+           `programs` array instead of re-sorting a passed-in `programs` param,
+           matching the order `ProgramsView`'s `ForEach` renders. `ProgramsView`
+           now holds `@State private var viewModel = ProgramsViewModel()`,
+           keeps its `@Query private var programs`/`@Query private var maxes`,
+           and feeds the VM via `.onChange(of: programs, initial: true)`; the
+           row `ForEach` reads `viewModel.programs`. Preset-insert buttons,
+           delete swipe, builder sheet, and `ProgramDetailView` navigation
+           (load resolution stays in the separate `PlannedSetRow` component,
+           untouched — out of scope for the list VM) all preserved unchanged.
+           TDD: new `SpottersaurusTests/ProgramsViewModelTests.swift` (4 tests)
+           covers newest-first sorting regardless of input order, `update`
+           replacing prior derived state, `deletePrograms` removing from the
+           owned sorted order (in-memory `ModelContainer`), and
+           `loadFiveThreeOne` inserting a program with the `.fivethreeone`
+           rule. Package `swift test`: 84 XCTest + 35 Swift Testing, 0
+           failures (unaffected — Programs list VM lives in the app target). App-target
+           tests (`-only-testing:SpottersaurusTests`): 19 tests, 0 failures.
+           `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
+           Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
 - [ ] **F5 — Remove no-op `.refreshable`** (fixes #8 by deletion)
       Delete `.refreshable` from `HistoryView` + `AnalyticsView` (data is live via
       `@Query`); drop the now-unused `refreshSavedSessionCount` if nothing else calls

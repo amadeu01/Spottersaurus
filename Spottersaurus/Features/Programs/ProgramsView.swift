@@ -8,7 +8,7 @@ struct ProgramsView: View {
     @Query private var maxes: [UserMaxes]
     @State private var showingBuilder = false
 
-    private let viewModel = ProgramsViewModel()
+    @State private var viewModel = ProgramsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -28,7 +28,7 @@ struct ProgramsView: View {
                 }
 
                 Section("Programs") {
-                    ForEach(viewModel.sortedPrograms(programs)) { program in
+                    ForEach(viewModel.programs) { program in
                         NavigationLink {
                             ProgramDetailView(program: program, maxes: maxes)
                         } label: {
@@ -36,7 +36,7 @@ struct ProgramsView: View {
                         }
                     }
                     .onDelete { offsets in
-                        viewModel.deletePrograms(at: offsets, from: programs, in: modelContext)
+                        viewModel.deletePrograms(at: offsets, in: modelContext)
                     }
                 }
             }
@@ -55,6 +55,9 @@ struct ProgramsView: View {
                 ProgramBuilderView { draft in
                     viewModel.createProgram(from: draft, in: modelContext)
                 }
+            }
+            .onChange(of: programs, initial: true) { _, newValue in
+                viewModel.update(with: newValue)
             }
         }
     }
