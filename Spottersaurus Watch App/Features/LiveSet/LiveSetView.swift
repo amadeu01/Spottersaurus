@@ -39,6 +39,7 @@ struct LiveSetView: View {
                             tone: viewModel.tone,
                             alertStage: viewModel.alertStage
                         )
+                        HRAuthIndicatorView(status: viewModel.hrAuthStatus)
                         LiveSetRepGaugeView(
                             repCount: viewModel.repCount,
                             targetReps: viewModel.targetReps,
@@ -147,6 +148,7 @@ struct LiveSetView: View {
             feedback = WatchLiveSetFeedback(logger: dependencies.logger)
             crownFocused = crownEditingEnabled
             handleLatestCommand()
+            sessionCoordinator.refreshHRAuthStatus(viewModel: viewModel)
         }
         .onDisappear {
             sessionCoordinator.stop(logger: dependencies.logger)

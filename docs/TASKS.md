@@ -130,9 +130,28 @@ on **first arm**, asked once. No auth today → HR empty + nothing written to Ap
            HealthKit prompt actually appears on first arm, HR reads flow into
            the live set, and the finished workout lands in Apple Health
            (Simulator cannot show or authorize the real HK permission sheet). -->
-- [ ] **C3 — Surface auth state on Watch** (Watch UI, `#Preview`)
+- [x] **C3 — Surface auth state on Watch** (Watch UI, `#Preview`) (2026-07-09)
       Show a compact indicator when HR auth is denied/undetermined so the user knows
       why HR is blank. `#Preview` the states. Done-when: builds, preview renders.
+      <!-- `LiveSetViewModel` gained a `private(set) var hrAuthStatus:
+           HealthAuthorizationStatus` (defaults `.notDetermined`) plus
+           `refreshHRAuthStatus(using:) async`, which is the only way to set
+           it — read-only from the UI's perspective. `WatchLiveSessionCoordinator`
+           now takes an injectable `authorizer: any HealthKitAuthorizing`
+           (default `HealthKitAuthorizer()`, shared with the
+           `WatchWorkoutSessionAdapter` it constructs) and exposes
+           `refreshHRAuthStatus(viewModel:)`, called from `LiveSetView.onAppear`
+           and again internally after `workoutAdapter.start` resolves
+           (success or failure) so a mid-arm permission grant/denial is
+           picked up. New `Spottersaurus Watch App/Components/HRAuthIndicatorView.swift`
+           renders nothing when `.sharingAuthorized`, else a compact
+           heart.slash caution chip ("HR not authorized" / "Enable HR in
+           Settings"); placed in `LiveSetView` directly under
+           `LiveSetHeaderView`, above the rep gauge/metrics grid so it
+           doesn't disturb the RACK IT overlay or existing layout. Three
+           `#Preview`s cover all three statuses. No Watch test target exists
+           (confirmed again per C1/C2), so this is Watch-UI-only; package
+           tests (84 XCTest + 18 Swift Testing, 0 failures) are unaffected. -->
 
 ### Block D — Connection visibility (#2). Depends on A3.
 Grill decision: WCSession state exists but is only logged; surface it reactively.

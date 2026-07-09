@@ -12,6 +12,13 @@ final class LiveSetViewModel {
     var velocityMS: Double
     var restElapsed: TimeInterval
 
+    /// Current HealthKit heart-rate read-authorization status. Refreshed by
+    /// `WatchLiveSessionCoordinator` (on screen appear and after each session
+    /// start) via `refreshHRAuthStatus(using:)` below — deliberately
+    /// read-only from the UI's perspective (`HRAuthIndicatorView` only
+    /// renders it) since the setter is private to this type.
+    private(set) var hrAuthStatus: HealthAuthorizationStatus = .notDetermined
+
     private var lifecycle: SetLifecycleController
     private var calibrationState: LiveSetCalibrationState
     private var warmupMotionSamples: [MotionSample] = []
@@ -302,6 +309,13 @@ final class LiveSetViewModel {
         heartRateSamples.append(sample)
         heartRate = Int(sample.beatsPerMinute.rounded())
         trimSamples()
+    }
+
+    /// Re-queries the HealthKit heart-rate authorization status so the UI can
+    /// explain a blank HR readout (denied vs. never asked). Safe to call
+    /// repeatedly; does not itself trigger a permission prompt.
+    func refreshHRAuthStatus(using authorizer: any HealthKitAuthorizing) async {
+        hrAuthStatus = await authorizer.authorizationStatusForHeartRate()
     }
 
     func autoRackFromHardware() {

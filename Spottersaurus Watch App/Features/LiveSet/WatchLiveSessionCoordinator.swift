@@ -3,12 +3,32 @@ import SpottersaurusKit
 
 @MainActor
 final class WatchLiveSessionCoordinator {
-    private let workoutAdapter = WatchWorkoutSessionAdapter()
+    private let workoutAdapter: WatchWorkoutSessionAdapter
     private let motionAdapter = WatchMotionStreamAdapter()
+    private let authorizer: any HealthKitAuthorizing
     private var tickGate = LiveTickGate()
+
+    /// `authorizer` is injectable (defaulting to the real `HealthKitAuthorizer`)
+    /// so the "ask once" gate and status queries stay consistent with C1/C2 —
+    /// it's shared with the `WatchWorkoutSessionAdapter` it hands off to.
+    init(authorizer: any HealthKitAuthorizing = HealthKitAuthorizer()) {
+        self.authorizer = authorizer
+        self.workoutAdapter = WatchWorkoutSessionAdapter(authorizer: authorizer)
+    }
 
     var isRunning: Bool {
         workoutAdapter.isRunning || motionAdapter.isRunning
+    }
+
+    /// Re-queries HR authorization status and pushes it onto `viewModel` so
+    /// `HRAuthIndicatorView` can explain a blank HR readout. Called on the
+    /// live-set screen's `onAppear` and again once a session finishes
+    /// starting (below), since the user may grant/deny the permission sheet
+    /// mid-arm.
+    func refreshHRAuthStatus(viewModel: LiveSetViewModel) {
+        Task {
+            await viewModel.refreshHRAuthStatus(using: authorizer)
+        }
     }
 
     func startMotion(
@@ -47,6 +67,10 @@ final class WatchLiveSessionCoordinator {
                 // Simulator and devices without HealthKit authorization can
                 // still exercise the live-set UI through manual controls.
             }
+            // Refresh regardless of success/failure: the authorization
+            // request/prompt happens inside `workoutAdapter.start`, so this
+            // is the earliest point the resulting status is known.
+            self.refreshHRAuthStatus(viewModel: viewModel)
         }
     }
 
