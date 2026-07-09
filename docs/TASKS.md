@@ -437,9 +437,25 @@ no-op `.refreshable`. Add `#Preview` everywhere.
            SUCCEEDED. -->
 
 ### Block G — Touch targets (#7). Independent.
-- [ ] **G1 — 44pt touch-target audit (Watch)**
+- [x] **G1 — 44pt touch-target audit (Watch)** (2026-07-09)
       Audit crown-mode, header, and calibration-panel controls to ≥44pt hit targets
       (liveButtons already comply). Done-when: all interactive Watch controls ≥44pt.
+      <!-- Audited every `Button` under `Spottersaurus Watch App/` (grep confirmed
+           no other `Button`/`.onTapGesture`/`Toggle`/`Stepper`/`Picker` controls
+           exist outside the ones already known). `LiveSetCrownModeControlView`'s
+           two mode-toggle icon buttons and `LiveSetHeaderView` (no buttons, just a
+           status glyph) were already compliant. Found two real gaps:
+           `LiveSetControlsView`'s "Rest Done" button (`.racked`/`.resting` state)
+           had no `.frame` at all, unlike its sibling Arm/Rack/RACK IT buttons — now
+           `.frame(maxWidth: .infinity, minHeight: 44)`. `LiveSetCalibrationPanelView`'s
+           "Warmup"/"Restart" and "Save" buttons had no explicit hit-target sizing;
+           now each label carries `.frame(maxWidth: .infinity, minHeight: 44)`,
+           splitting the HStack evenly while guaranteeing ≥44pt height. No
+           behavior/callback changes; `RackItOverlayView`'s "Resolved" button was
+           already `.frame(minWidth: 96, minHeight: 44)`. Package `swift test`: 35
+           Swift Testing tests, 0 failures. `xcodebuild -scheme 'Spottersaurus
+           Watch App' -destination 'generic/platform=watchOS Simulator' build`:
+           BUILD SUCCEEDED. -->
 
 ### Phase 0 — dependency order for dispatch
 `A1 → A2 → A3` (then `A4`, `B1→B2`, `D1→D2/D3` can run once A3 lands) ·

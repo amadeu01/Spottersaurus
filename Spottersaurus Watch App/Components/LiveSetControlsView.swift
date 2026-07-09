@@ -36,6 +36,7 @@ struct LiveSetControlsView: View {
             case .racked, .resting:
                 Button(action: finishRest) {
                     Label("Rest Done", systemImage: "timer")
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.Colors.optimal)

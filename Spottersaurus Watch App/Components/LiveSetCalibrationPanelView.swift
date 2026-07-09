@@ -32,12 +32,14 @@ struct LiveSetCalibrationPanelView: View {
             HStack(spacing: Theme.Spacing.xs) {
                 Button(action: start) {
                     Label(isCollecting ? "Restart" : "Warmup", systemImage: "flame.fill")
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.bordered)
                 .tint(Theme.Colors.brandOrange)
 
                 Button(action: finish) {
                     Label("Save", systemImage: "checkmark")
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.Colors.optimal)
