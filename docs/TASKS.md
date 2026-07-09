@@ -315,8 +315,32 @@ no-op `.refreshable`. Add `#Preview` everywhere.
            (`-only-testing:SpottersaurusTests`): 10 tests, 0 failures.
            `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
            Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
-- [ ] **F3 — `MaxesViewModel` → @Observable hybrid** (TDD)
+- [x] **F3 — `MaxesViewModel` → @Observable hybrid** (TDD) (2026-07-09)
       Same pattern for the Maxes editor. Test derived output. Done-when: green.
+      <!-- `MaxesViewModel` is now a `@MainActor @Observable final class` owning
+           `private(set) var competitionMaxes: [UserMaxes]`, populated only via
+           `update(with:)` (filters + orders to squat → bench → deadlift, same
+           as the prior stateless `competitionMaxes(from:)` helper).
+           `ensureCompetitionMaxesExist(in:existingMaxes:)` keeps its exact
+           prior signature/behavior (a side effect on `modelContext`, not
+           derived state — still called from `.onAppear`). `MaxesView` now
+           holds `@State private var viewModel = MaxesViewModel()`, keeps its
+           `@Query private var maxes`, and feeds the VM via `.onChange(of:
+           maxes, initial: true)`; the row `ForEach` reads
+           `viewModel.competitionMaxes`. Debug Logs toolbar entry (A4)
+           untouched; edit flows (`MaxesRow`'s `@Bindable` Steppers) untouched
+           — they bind directly to the `UserMaxes` model objects still owned
+           by SwiftData. TDD: new `SpottersaurusTests/MaxesViewModelTests.swift`
+           (5 tests) covers competition-order sorting regardless of input
+           order, exclusion of `.accessory`, omission of missing competition
+           lifts, `update` replacing prior derived state, and
+           `ensureCompetitionMaxesExist` inserting only the missing lifts
+           (in-memory `ModelContainer`) while leaving existing records
+           untouched. Package `swift test`: 84 XCTest + 35 Swift Testing, 0
+           failures (unaffected — Maxes lives in the app target). App-target
+           tests (`-only-testing:SpottersaurusTests`): 15 tests, 0 failures.
+           `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
+           Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
 - [ ] **F4 — `ProgramsViewModel` → @Observable hybrid** (TDD)
       Same pattern for Programs list. Test derived output. Done-when: green.
 - [ ] **F5 — Remove no-op `.refreshable`** (fixes #8 by deletion)

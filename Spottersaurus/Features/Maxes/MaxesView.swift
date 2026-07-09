@@ -6,13 +6,13 @@ struct MaxesView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var maxes: [UserMaxes]
 
-    private let viewModel = MaxesViewModel()
+    @State private var viewModel = MaxesViewModel()
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Training Maxes") {
-                    ForEach(viewModel.competitionMaxes(from: maxes)) { maxRecord in
+                    ForEach(viewModel.competitionMaxes) { maxRecord in
                         MaxesRow(maxes: maxRecord)
                     }
                 }
@@ -29,6 +29,9 @@ struct MaxesView: View {
             }
             .onAppear {
                 viewModel.ensureCompetitionMaxesExist(in: modelContext, existingMaxes: maxes)
+            }
+            .onChange(of: maxes, initial: true) { _, newValue in
+                viewModel.update(with: newValue)
             }
         }
     }
