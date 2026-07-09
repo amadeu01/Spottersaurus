@@ -573,11 +573,22 @@ in parallel with the rest. Review each subagent commit before dispatching depend
            'platform=iOS Simulator,name=iPhone 17' build`: BUILD SUCCEEDED.
            `-only-testing:SpottersaurusTests`: TEST SUCCEEDED (19 cases,
            unchanged — the pure mapping lives entirely in the package). -->
-- [ ] **H3 — Health sync service (`lastSyncedAt` + status)** (TDD-light)
+- [x] **H3 — Health sync service (`lastSyncedAt` + status)** (TDD-light) (2026-07-09)
       An `@Observable @MainActor` service tying H1 (auth) + H2 (import): `sync()` async
       that authorizes, imports, persists, stamps `lastSyncedAt`, exposes a status
       (`idle`/`syncing`/`synced(date)`/`failed`). Log each step under `.health`. Test
       the status state machine with fakes. Done-when: tests green, iOS builds.
+      <!-- `Spottersaurus/Features/Health/HealthSyncService.swift` (@MainActor
+           @Observable) ties H1 auth + H2 import: sync(context:) authorizes ->
+           HealthImporter.importRecent() -> HealthSyncPersister.persist ->
+           stamp lastSyncedAt (UserDefaults) + status idle/syncing/synced/failed.
+           Never throws; failed status carries no partial persistence. New
+           SpottersaurusKit/Persistence/HealthSyncPersister.swift upserts
+           workouts by healthKitWorkoutUUID as .appleHealth history + single
+           latest BodyWeightEntry (new @Model, registered in schema). SourceDevice
+           gains .appleHealth. 5 Swift Testing cases via package fakes. Package
+           swift test green (35). Commit 852f712. -->
+
 
 ### Block P — Profile tab (absorbs Maxes). Depends on H3.
 - [ ] **P1 — `ProfileView`** (iOS UI, `#Preview`)
