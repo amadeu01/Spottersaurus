@@ -29,3 +29,39 @@ struct LiveSetHeaderView: View {
         }
     }
 }
+
+#Preview("Optimal") {
+    LiveSetHeaderView(
+        exerciseName: "Bench Press",
+        statusText: "Repping",
+        statusSymbol: "checkmark.circle.fill",
+        tone: .optimal,
+        alertStage: .none
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
+}
+
+#Preview("Grinding") {
+    LiveSetHeaderView(
+        exerciseName: "Bench Press",
+        statusText: "Grinding",
+        statusSymbol: "exclamationmark.triangle.fill",
+        tone: .caution,
+        alertStage: .grinding
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
+}
+
+#Preview("Rack It") {
+    LiveSetHeaderView(
+        exerciseName: "Bench Press",
+        statusText: "RACK IT",
+        statusSymbol: "hand.raised.fill",
+        tone: .alert,
+        alertStage: .rackIt
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
+}

@@ -53,3 +53,29 @@ struct LiveSetCalibrationPanelView: View {
         )
     }
 }
+
+#Preview("Idle") {
+    LiveSetCalibrationPanelView(
+        statusText: "Warmup ready",
+        detailText: "Do a clean warmup rep to calibrate tempo & velocity.",
+        progress: 0,
+        isCollecting: false,
+        start: {},
+        finish: {}
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
+}
+
+#Preview("Collecting") {
+    LiveSetCalibrationPanelView(
+        statusText: "Collecting warmup…",
+        detailText: "1 rep detected, 1.05s concentric.",
+        progress: 0.6,
+        isCollecting: true,
+        start: {},
+        finish: {}
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
+}

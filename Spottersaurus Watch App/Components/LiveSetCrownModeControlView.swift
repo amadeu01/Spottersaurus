@@ -29,3 +29,15 @@ struct LiveSetCrownModeControlView: View {
         }
     }
 }
+
+#Preview("Load selected") {
+    LiveSetCrownModeControlView(mode: .load, selectLoad: {}, selectReps: {})
+        .padding()
+        .background(Theme.Colors.canvas)
+}
+
+#Preview("Reps selected") {
+    LiveSetCrownModeControlView(mode: .reps, selectLoad: {}, selectReps: {})
+        .padding()
+        .background(Theme.Colors.canvas)
+}

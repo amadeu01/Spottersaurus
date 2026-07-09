@@ -26,3 +26,7 @@ struct RackItOverlayView: View {
         .background(Theme.Colors.alert)
     }
 }
+
+#Preview("Alerting") {
+    RackItOverlayView(resolveAlert: {})
+}

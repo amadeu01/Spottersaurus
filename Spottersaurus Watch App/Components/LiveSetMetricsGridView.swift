@@ -24,3 +24,15 @@ struct LiveSetMetricsGridView: View {
         }
     }
 }
+
+#Preview {
+    LiveSetMetricsGridView(
+        velocityMS: 0.42,
+        heartRate: 128,
+        weightKg: 100,
+        restText: "1:30",
+        targetReps: "3 of 5"
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
+}

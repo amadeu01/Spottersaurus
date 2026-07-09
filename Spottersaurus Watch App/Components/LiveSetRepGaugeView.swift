@@ -30,3 +30,21 @@ struct LiveSetRepGaugeView: View {
         }
     }
 }
+
+#Preview("Optimal") {
+    LiveSetRepGaugeView(repCount: 2, targetReps: 5, progress: 0.4, tone: .optimal, alertStage: .none)
+        .padding()
+        .background(Theme.Colors.canvas)
+}
+
+#Preview("Grinding") {
+    LiveSetRepGaugeView(repCount: 4, targetReps: 5, progress: 0.8, tone: .caution, alertStage: .grinding)
+        .padding()
+        .background(Theme.Colors.canvas)
+}
+
+#Preview("Rack It") {
+    LiveSetRepGaugeView(repCount: 5, targetReps: 5, progress: 1.0, tone: .alert, alertStage: .rackIt)
+        .padding()
+        .background(Theme.Colors.canvas)
+}

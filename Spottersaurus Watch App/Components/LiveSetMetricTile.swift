@@ -32,3 +32,15 @@ struct LiveSetMetricTile: View {
         )
     }
 }
+
+#Preview("With unit") {
+    LiveSetMetricTile(label: "VEL", value: "0.42", unit: "m/s")
+        .padding()
+        .background(Theme.Colors.canvas)
+}
+
+#Preview("No unit") {
+    LiveSetMetricTile(label: "REPS", value: "3 of 5", unit: nil)
+        .padding()
+        .background(Theme.Colors.canvas)
+}

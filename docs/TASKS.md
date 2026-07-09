@@ -418,9 +418,23 @@ no-op `.refreshable`. Add `#Preview` everywhere.
            `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
            Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
 
-- [ ] **F7 — `#Preview` sweep (Watch)**
+- [x] **F7 — `#Preview` sweep (Watch)** (2026-07-09)
       Add `#Preview` to the Watch feature views + components missing one (LiveSet
       panels, controls, overlays, metric tiles). Done-when: every Watch view previews.
+      <!-- Added `#Preview`s to every Watch Component that lacked one:
+           LiveSetCalibrationPanelView (idle/collecting), LiveSetCrownModeControlView
+           (load/reps selected), LiveSetHeaderView (optimal/grinding/rackIt tones),
+           LiveSetMetricTile (with/without unit), LiveSetMetricsGridView,
+           LiveSetRepGaugeView (optimal/grinding/rackIt), RackItOverlayView
+           (alerting). LiveSetView, LiveSetControlsView, HRAuthIndicatorView,
+           PhoneConnectionChip, and PipelineTelemetryView already had previews
+           from earlier phases. LiveSetTone (enum) and LiveSetCalibrationState
+           (enum) are pure logic, not Views — skipped per scope. No production
+           view logic changed; all no-op closures / representative enum cases
+           per house style. Package `swift test`: 84 XCTest + 35 Swift Testing,
+           0 failures (unaffected). `xcodebuild -scheme 'Spottersaurus Watch App'
+           -destination 'generic/platform=watchOS Simulator' build`: BUILD
+           SUCCEEDED. -->
 
 ### Block G — Touch targets (#7). Independent.
 - [ ] **G1 — 44pt touch-target audit (Watch)**
