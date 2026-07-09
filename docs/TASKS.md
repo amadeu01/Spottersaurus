@@ -496,11 +496,24 @@ in parallel with the rest. Review each subagent commit before dispatching depend
       Review becomes just the History/Analytics segmented picker. Drop the card +
       the now-unused `watchMonitor` wiring in `ReviewView` if nothing else needs it.
       Keep the `#Preview`. Done-when: builds, Review shows no live card.
-- [ ] **R2 — Show live-tick card on `TodayView`, session-active only** (iOS UI, `#Preview`)
+- [x] **R2 — Show live-tick card on `TodayView`, session-active only** (iOS UI, `#Preview`) (2026-07-09)
       Render `LiveWatchStatusCardView` on Today ONLY while a Watch session is active
       — gate on `PhoneWatchSessionMonitor.shared.lastTick` recency (e.g. a tick within
       the last N seconds) so it appears mid-set and hides when idle. `#Preview` both
       states (active tick vs none). Done-when: builds, card shows only with a recent tick.
+      <!-- `TodayView` gained `static let liveSessionWindow: TimeInterval = 10` +
+           a private `isLiveSessionActive(at:)` helper (`lastTick != nil` AND
+           `now.timeIntervalSince(lastTickReceivedAt) <= liveSessionWindow`).
+           The card is wrapped in `TimelineView(.periodic(from: .now, by: 1))`
+           purely so the gate re-evaluates once a second and the card
+           disappears shortly after ticks stop even with no new data arriving
+           — placed right under the `WatchConnectionChip`, above the planned
+           session card, so it's visible mid-set without disturbing the rest
+           of Today. Two new `#Preview`s ("Watch session live" / "Watch
+           session idle") seed `PhoneWatchSessionMonitor.shared` directly.
+           Package `swift test`: 84 XCTest + 35 Swift Testing, 0 failures.
+           `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
+           Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
 
 ### Block H — Apple Health import (iPhone). Depends on nothing; H2 after H1.
 - [ ] **H1 — iPhone `HealthKitAuthorizing` impl** (TDD via package fake)
