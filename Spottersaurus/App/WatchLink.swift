@@ -35,8 +35,12 @@ final class WatchLink: NSObject, WCSessionDelegate {
     func send(command: WatchCommandEnvelope) async -> WatchCommandSendStatus {
         guard let session, session.isReachable else {
             logger.warning(.watchLink, "watch command unavailable reachable=\(session?.isReachable ?? false)")
+            if let session {
+                pushSessionState(session)
+            }
             return .watchUnavailable
         }
+        pushSessionState(session)
 
         let data: Data
         do {
@@ -72,6 +76,7 @@ final class WatchLink: NSObject, WCSessionDelegate {
             logger.warning(.watchLink, "WCSession unsupported; using standalone fallback")
             return .standaloneFallback
         }
+        pushSessionState(session)
         guard session.isPaired, session.isWatchAppInstalled else {
             logger.warning(.watchLink, "watch unavailable paired=\(session.isPaired) installed=\(session.isWatchAppInstalled)")
             return .standaloneFallback
@@ -127,6 +132,7 @@ final class WatchLink: NSObject, WCSessionDelegate {
         error: Error?
     ) {
         logger.info(.watchLink, "iPhone WCSession activation state=\(activationState.rawValue) error=\(error?.localizedDescription ?? "none")")
+        pushSessionState(session, activationState: activationState)
     }
 
     func sessionDidBecomeInactive(_ session: WCSession) {}
@@ -134,6 +140,32 @@ final class WatchLink: NSObject, WCSessionDelegate {
     func sessionDidDeactivate(_ session: WCSession) {
         logger.info(.watchLink, "iPhone WCSession deactivated; reactivating")
         session.activate()
+    }
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        logger.info(.watchLink, "iPhone WCSession reachability changed reachable=\(session.isReachable)")
+        pushSessionState(session)
+    }
+
+    /// Pushes the current `WCSession` flags into `PhoneWatchSessionMonitor`
+    /// so the UI can observe connection state reactively. `activationState`
+    /// defaults to the session's own current value; delegate callbacks that
+    /// receive a fresher value (activation completing) pass it explicitly
+    /// since `session.activationState` may not have updated yet when the
+    /// callback fires.
+    private func pushSessionState(
+        _ session: WCSession,
+        activationState: WCSessionActivationState? = nil
+    ) {
+        let resolvedActivationState = (activationState ?? session.activationState).rawValue
+        Task { @MainActor in
+            PhoneWatchSessionMonitor.shared.updateSessionState(
+                isPaired: session.isPaired,
+                isWatchAppInstalled: session.isWatchAppInstalled,
+                isReachable: session.isReachable,
+                activationState: resolvedActivationState
+            )
+        }
     }
 
     func session(_ session: WCSession, didReceiveMessageData messageData: Data) {

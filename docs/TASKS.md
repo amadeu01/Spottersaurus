@@ -156,11 +156,18 @@ on **first arm**, asked once. No auth today → HR empty + nothing written to Ap
 ### Block D — Connection visibility (#2). Depends on A3.
 Grill decision: WCSession state exists but is only logged; surface it reactively.
 
-- [ ] **D1 — `PhoneWatchSessionMonitor` exposes WCSession state** (TDD-light)
+- [x] **D1 — `PhoneWatchSessionMonitor` exposes WCSession state** (TDD-light) (2026-07-09)
       Add `@Observable` fields for `activationState`, `isReachable`, `isPaired`,
       `isWatchAppInstalled`; update them from the iOS `WatchLink` delegate callbacks.
       Test the reducer that maps a session-state snapshot → a `ConnectionStatus` enum
       (pure). Done-when: test green, monitor updates on delegate events.
+      <!-- Added `ConnectionStatus` (pure enum + `resolve` reducer) to
+           SpottersaurusKit/Sync, table-tested in ConnectionStatusTests (7
+           cases). `PhoneWatchSessionMonitor` gained isReachable/isPaired/
+           isWatchAppInstalled/activationState + computed `connectionStatus`
+           and `updateSessionState(...)`. `WatchLink` pushes snapshots from
+           activationDidCompleteWith, the new sessionReachabilityDidChange,
+           and both send() paths. -->
 - [ ] **D2 — Connection status chip** (iPhone UI, `#Preview`)
       Small reusable chip (connected / unreachable / not paired / app not installed),
       shown on Today and reused inside `LiveWatchStatusCardView`. `#Preview` each state.
