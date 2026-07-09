@@ -14,10 +14,12 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     header
+                    WatchConnectionChip(status: watchMonitor.connectionStatus)
                     LiveWatchStatusCardView(
                         tick: watchMonitor.lastTick,
                         receivedAt: watchMonitor.lastTickReceivedAt,
-                        importMessage: watchMonitor.lastImportMessage
+                        importMessage: watchMonitor.lastImportMessage,
+                        connectionStatus: watchMonitor.connectionStatus
                     )
 
                     if let program = viewModel.activeProgram(from: programs),

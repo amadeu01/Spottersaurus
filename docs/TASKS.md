@@ -168,10 +168,20 @@ Grill decision: WCSession state exists but is only logged; surface it reactively
            and `updateSessionState(...)`. `WatchLink` pushes snapshots from
            activationDidCompleteWith, the new sessionReachabilityDidChange,
            and both send() paths. -->
-- [ ] **D2 — Connection status chip** (iPhone UI, `#Preview`)
+- [x] **D2 — Connection status chip** (iPhone UI, `#Preview`) (2026-07-09)
       Small reusable chip (connected / unreachable / not paired / app not installed),
       shown on Today and reused inside `LiveWatchStatusCardView`. `#Preview` each state.
       Done-when: builds, previews render, Today shows live status.
+      <!-- New `Spottersaurus/Components/WatchConnectionChip.swift`: takes a
+           `ConnectionStatus`, renders an icon+label capsule pill tinted per
+           state (green connected, amber unreachable/app-not-installed, gray
+           notPaired/inactive). `TodayView` shows it near the header, driven
+           reactively by `PhoneWatchSessionMonitor.shared.connectionStatus`
+           (`@Observable`); `LiveWatchStatusCardView` gained a
+           `connectionStatus` param (default `.inactive`) and now renders the
+           same chip in its header instead of the old ad-hoc timestamp/dot,
+           wired from both `TodayView` and `ReviewView`. One `#Preview`
+           renders all `ConnectionStatus.allCases`. -->
 - [ ] **D3 — Phone-reachability chip on Watch** (Watch UI, `#Preview`)
       Mirror a compact reachability chip on the Watch root using
       `WatchPlannedSessionStore` session state. `#Preview` states. Done-when: builds.

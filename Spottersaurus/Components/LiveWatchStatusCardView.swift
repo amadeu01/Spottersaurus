@@ -5,6 +5,7 @@ struct LiveWatchStatusCardView: View {
     var tick: LiveTickEnvelope?
     var receivedAt: Date?
     var importMessage: String
+    var connectionStatus: ConnectionStatus = .inactive
 
     var body: some View {
         GlassCard {
@@ -13,9 +14,7 @@ struct LiveWatchStatusCardView: View {
                     Label("Watch Live", systemImage: "applewatch.radiowaves.left.and.right")
                         .font(.system(.headline, design: .rounded, weight: .bold))
                     Spacer()
-                    Text(statusText)
-                        .font(.system(.caption2, design: .rounded, weight: .bold))
-                        .foregroundStyle(tick == nil ? .secondary : Theme.Colors.optimal)
+                    WatchConnectionChip(status: connectionStatus)
                 }
 
                 HStack(spacing: Theme.Spacing.sm) {
@@ -29,11 +28,6 @@ struct LiveWatchStatusCardView: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private var statusText: String {
-        guard let receivedAt else { return "WAITING" }
-        return receivedAt.formatted(date: .omitted, time: .standard)
     }
 
     private func liveMetric(_ label: String, _ value: String) -> some View {

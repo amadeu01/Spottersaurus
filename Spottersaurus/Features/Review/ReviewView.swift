@@ -10,7 +10,8 @@ struct ReviewView: View {
             LiveWatchStatusCardView(
                 tick: watchMonitor.lastTick,
                 receivedAt: watchMonitor.lastTickReceivedAt,
-                importMessage: watchMonitor.lastImportMessage
+                importMessage: watchMonitor.lastImportMessage,
+                connectionStatus: watchMonitor.connectionStatus
             )
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.top, Theme.Spacing.sm)
