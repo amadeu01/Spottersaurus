@@ -15,3 +15,13 @@ struct AnalyticsSummaryGridView: View {
         }
     }
 }
+
+#Preview {
+    AnalyticsSummaryGridView(
+        bestE1RM: "142",
+        totalTonnage: "2,340",
+        spotterFrequency: .init(grindCount: 4, rackItCount: 1)
+    )
+    .padding()
+    .background(Theme.Colors.canvas)
+}

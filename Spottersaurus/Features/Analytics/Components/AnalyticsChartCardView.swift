@@ -15,3 +15,15 @@ struct AnalyticsChartCardView<Content: View>: View {
         }
     }
 }
+
+#Preview {
+    ScrollView {
+        AnalyticsChartCardView(title: "e1RM Trend") {
+            Text("Chart content goes here")
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 120)
+        }
+        .padding()
+    }
+    .background(Theme.Colors.canvas)
+}

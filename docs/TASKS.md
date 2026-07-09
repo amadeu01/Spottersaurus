@@ -388,10 +388,36 @@ no-op `.refreshable`. Add `#Preview` everywhere.
            referenced the removed method). `xcodebuild -scheme Spottersaurus
            -destination 'platform=iOS Simulator,name=iPhone 17' build`: BUILD
            SUCCEEDED. -->
-- [ ] **F6 — `#Preview` sweep (iPhone)**
+- [x] **F6 — `#Preview` sweep (iPhone)** (2026-07-09)
       Add `#Preview` (using `makeModelContainer(inMemory:true)` + minimal seed) to
       Today, Programs, ProgramDetail, builders, Maxes, Review, SessionDetail, and the
       components missing one. Done-when: every iPhone view has a rendering preview.
+      <!-- New `#if DEBUG` `PreviewSupport/PreviewSeedData.swift`: a small
+           `PreviewSeed` enum (maxes/program/workoutSession + insertStandardSeed/
+           seededContainer helpers) shared across previews so feature files don't
+           each hand-roll domain objects. Added `#Preview`s to every iPhone
+           feature view and component that lacked one: Today (TodayView,
+           TodaySessionCard), Programs (ProgramsView, ProgramDetailView,
+           ProgramBuilderView, ProgramDayBuilderView — `@Previewable @State`
+           binding, PlannedSetBuilderView — same), Maxes (MaxesView), Review
+           (ReviewView), History (SessionDetailView + all 7 Components:
+           SpotterEventsView, RepMetricRowView, FlowLayout, HistorySessionRowView,
+           HistoryMetricLineView, SessionSummaryCardView,
+           CompletedSetDetailCardView), Analytics (all 8 Components:
+           AnalyticsChartCardView, AnalyticsMetricCardView, VelocityLoadChartView,
+           SpotterFrequencyChartView, AnalyticsSummaryGridView,
+           AnalyticsEmptyChartView, E1RMTrendChartView, TonnageChartView), and
+           top-level Components (PlannedSetRow, LiveWatchStatusCardView,
+           MetricLine, EmptyPlannerStateView — WatchConnectionChip already had
+           one). `SessionDetailView.swift`, `ProgramDetailView.swift`, and
+           `ReviewView.swift` needed a new `import SwiftData` to call
+           `.modelContainer(...)` in their previews (production code/behavior
+           unchanged). No production view logic changed. Package `swift test`:
+           84 XCTest + 35 Swift Testing, 0 failures (unaffected). App-target
+           tests (`-only-testing:SpottersaurusTests`): 19 tests, 0 failures.
+           `xcodebuild -scheme Spottersaurus -destination 'platform=iOS
+           Simulator,name=iPhone 17' build`: BUILD SUCCEEDED. -->
+
 - [ ] **F7 — `#Preview` sweep (Watch)**
       Add `#Preview` to the Watch feature views + components missing one (LiveSet
       panels, controls, overlays, metric tiles). Done-when: every Watch view previews.

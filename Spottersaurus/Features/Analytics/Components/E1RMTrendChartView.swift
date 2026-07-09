@@ -28,3 +28,25 @@ struct E1RMTrendChartView: View {
         }
     }
 }
+
+#Preview("With data") {
+    let calendar = Calendar.current
+    let points: [PerformanceAnalytics.TrendPoint] = (0..<4).map { offset in
+        .init(
+            date: calendar.date(byAdding: .weekOfYear, value: -offset, to: .now) ?? .now,
+            e1RMKg: 130 + Double(offset) * 4
+        )
+    }.reversed()
+
+    return ScrollView {
+        E1RMTrendChartView(points: points)
+            .padding()
+    }
+    .background(Theme.Colors.canvas)
+}
+
+#Preview("Empty") {
+    E1RMTrendChartView(points: [])
+        .padding()
+        .background(Theme.Colors.canvas)
+}

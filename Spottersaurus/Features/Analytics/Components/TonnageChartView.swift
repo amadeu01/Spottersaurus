@@ -23,3 +23,25 @@ struct TonnageChartView: View {
         }
     }
 }
+
+#Preview("With data") {
+    let calendar = Calendar.current
+    let points: [PerformanceAnalytics.TonnagePoint] = (0..<4).map { offset in
+        .init(
+            date: calendar.date(byAdding: .weekOfYear, value: -offset, to: .now) ?? .now,
+            tonnageKg: 2200 + Double(offset) * 150
+        )
+    }.reversed()
+
+    return ScrollView {
+        TonnageChartView(points: points)
+            .padding()
+    }
+    .background(Theme.Colors.canvas)
+}
+
+#Preview("Empty") {
+    TonnageChartView(points: [])
+        .padding()
+        .background(Theme.Colors.canvas)
+}

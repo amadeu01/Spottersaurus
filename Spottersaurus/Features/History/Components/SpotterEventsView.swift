@@ -34,3 +34,11 @@ private struct SpotterEventPillView: View {
         event.stage == .rackIt ? Theme.Colors.alert : Theme.Colors.caution
     }
 }
+
+#Preview {
+    SpotterEventsView(events: [
+        SpotterEvent(stage: .grind, timestamp: 12, repIndex: 2),
+        SpotterEvent(stage: .rackIt, timestamp: 19, repIndex: 4),
+    ])
+    .padding()
+}

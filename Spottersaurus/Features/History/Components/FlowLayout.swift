@@ -81,3 +81,17 @@ struct FlowLayout: Layout {
         }
     }
 }
+
+#Preview {
+    FlowLayout(alignment: .leading, spacing: 8) {
+        ForEach(["Grind rep 2", "Rack It rep 4", "Squat", "Bench Press", "Deadlift"], id: \.self) { label in
+            Text(label)
+                .font(.caption.bold())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.gray.opacity(0.2), in: Capsule())
+        }
+    }
+    .padding()
+    .frame(width: 220)
+}

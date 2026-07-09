@@ -82,3 +82,7 @@ private struct ProgramDayDraftRow: View {
         }
     }
 }
+
+#Preview {
+    ProgramBuilderView { _ in }
+}

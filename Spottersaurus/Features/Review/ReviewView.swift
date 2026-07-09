@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import SpottersaurusKit
 
@@ -51,4 +52,9 @@ private enum ReviewSection: String, CaseIterable, Identifiable {
         case .analytics: "Analytics"
         }
     }
+}
+
+#Preview {
+    ReviewView()
+        .modelContainer(PreviewSeed.seededContainer())
 }

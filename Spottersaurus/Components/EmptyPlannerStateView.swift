@@ -17,3 +17,11 @@ struct EmptyPlannerStateView: View {
         .glassCard()
     }
 }
+
+#Preview {
+    ScrollView {
+        EmptyPlannerStateView()
+            .padding()
+    }
+    .background(Theme.Colors.canvas)
+}

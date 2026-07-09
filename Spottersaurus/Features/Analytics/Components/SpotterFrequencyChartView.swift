@@ -25,3 +25,9 @@ struct SpotterFrequencyChartView: View {
         ]
     }
 }
+
+#Preview {
+    SpotterFrequencyChartView(frequency: .init(grindCount: 4, rackItCount: 1))
+        .padding()
+        .background(Theme.Colors.canvas)
+}

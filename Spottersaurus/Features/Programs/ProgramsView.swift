@@ -76,3 +76,8 @@ private struct ProgramListRow: View {
         }
     }
 }
+
+#Preview {
+    ProgramsView()
+        .modelContainer(PreviewSeed.seededContainer())
+}

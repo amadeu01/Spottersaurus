@@ -88,3 +88,13 @@ struct TodayView: View {
         }
     }
 }
+
+#Preview("With active program") {
+    TodayView()
+        .modelContainer(PreviewSeed.seededContainer())
+}
+
+#Preview("No program loaded") {
+    TodayView()
+        .modelContainer(try! makeModelContainer(inMemory: true, cloudKit: false))
+}

@@ -86,3 +86,16 @@ struct PlannedSetBuilderView: View {
         return seconds == 0 ? "\(minutes)m" : "\(minutes)m \(seconds)s"
     }
 }
+
+#Preview {
+    @Previewable @State var set = PlannedSetDraft(
+        lift: .bench,
+        targetReps: 5,
+        load: PlannedSetLoadDraft(kind: .percentOfTrainingMax, value: 85),
+        isAMRAP: true
+    )
+
+    return NavigationStack {
+        PlannedSetBuilderView(set: $set)
+    }
+}

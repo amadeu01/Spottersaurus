@@ -48,3 +48,25 @@ struct PlannedSetRow: View {
         }
     }
 }
+
+#Preview {
+    let maxes = PreviewSeed.maxes()
+    let squat = PlannedSet(
+        exercise: Exercise(name: "Back Squat", kind: .squat),
+        targetReps: 5,
+        load: .percentOfTrainingMax(percent: 85),
+        isAMRAP: true,
+        restSeconds: 180
+    )
+    let bench = PlannedSet(
+        exercise: Exercise(name: "Bench Press", kind: .bench),
+        targetReps: 8,
+        load: .absolute(kg: 60),
+        restSeconds: 90
+    )
+
+    return List {
+        PlannedSetRow(set: squat, maxes: maxes)
+        PlannedSetRow(set: bench, maxes: maxes)
+    }
+}

@@ -39,3 +39,15 @@ struct CompletedSetDetailCardView: View {
         }
     }
 }
+
+#Preview {
+    let viewModel = HistoryViewModel()
+    let session = PreviewSeed.workoutSession()
+    viewModel.update(with: [session])
+
+    return ScrollView {
+        CompletedSetDetailCardView(set: viewModel.orderedSets(in: session)[0], viewModel: viewModel)
+            .padding()
+    }
+    .background(Theme.Colors.canvas)
+}

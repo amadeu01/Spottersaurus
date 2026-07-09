@@ -56,3 +56,8 @@ private struct MaxesRow: View {
         .padding(.vertical, Theme.Spacing.xs)
     }
 }
+
+#Preview {
+    MaxesView()
+        .modelContainer(PreviewSeed.seededContainer())
+}

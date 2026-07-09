@@ -60,3 +60,17 @@ private struct PlannedSetDraftRow: View {
         }
     }
 }
+
+#Preview {
+    @Previewable @State var day = ProgramDayDraft(
+        name: "Squat Day",
+        sets: [
+            PlannedSetDraft(lift: .squat, targetReps: 5, load: PlannedSetLoadDraft(kind: .percentOfTrainingMax, value: 85)),
+            PlannedSetDraft(lift: .accessory, targetReps: 12, load: PlannedSetLoadDraft(kind: .absolute, value: 40)),
+        ]
+    )
+
+    return NavigationStack {
+        ProgramDayBuilderView(day: $day)
+    }
+}

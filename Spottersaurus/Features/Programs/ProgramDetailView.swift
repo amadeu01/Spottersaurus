@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import SpottersaurusKit
 
@@ -18,4 +19,14 @@ struct ProgramDetailView: View {
         .navigationTitle(program.name)
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+#Preview {
+    let maxes = PreviewSeed.maxes()
+    let program = PreviewSeed.program(maxes: maxes)
+
+    return NavigationStack {
+        ProgramDetailView(program: program, maxes: maxes)
+    }
+    .modelContainer(try! makeModelContainer(inMemory: true, cloudKit: false))
 }

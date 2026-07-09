@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import SpottersaurusKit
 
@@ -21,4 +22,11 @@ struct SessionDetailView: View {
         .navigationTitle(viewModel.sessionTitle(session))
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+#Preview {
+    NavigationStack {
+        SessionDetailView(session: PreviewSeed.workoutSession())
+    }
+    .modelContainer(try! makeModelContainer(inMemory: true, cloudKit: false))
 }

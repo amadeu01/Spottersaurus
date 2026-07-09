@@ -25,3 +25,12 @@ struct AnalyticsMetricCardView: View {
         }
     }
 }
+
+#Preview {
+    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Theme.Spacing.sm) {
+        AnalyticsMetricCardView(label: "BEST e1RM", value: "142 kg", systemImage: "bolt.fill")
+        AnalyticsMetricCardView(label: "TONNAGE", value: "2,340 kg", systemImage: "scalemass.fill")
+    }
+    .padding()
+    .background(Theme.Colors.canvas)
+}

@@ -13,3 +13,9 @@ struct AnalyticsEmptyChartView: View {
         .frame(maxWidth: .infinity, minHeight: 160)
     }
 }
+
+#Preview {
+    AnalyticsEmptyChartView()
+        .padding()
+        .background(Theme.Colors.canvas)
+}

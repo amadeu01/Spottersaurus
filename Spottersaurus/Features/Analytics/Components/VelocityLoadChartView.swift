@@ -24,3 +24,21 @@ struct VelocityLoadChartView: View {
         }
     }
 }
+
+#Preview("With data") {
+    ScrollView {
+        VelocityLoadChartView(points: [
+            .init(weightKg: 60, meanVelocityMS: 0.65),
+            .init(weightKg: 80, meanVelocityMS: 0.52),
+            .init(weightKg: 100, meanVelocityMS: 0.38),
+        ])
+        .padding()
+    }
+    .background(Theme.Colors.canvas)
+}
+
+#Preview("Empty") {
+    VelocityLoadChartView(points: [])
+        .padding()
+        .background(Theme.Colors.canvas)
+}

@@ -26,3 +26,14 @@ struct TodaySessionCard: View {
         }
     }
 }
+
+#Preview {
+    let maxes = PreviewSeed.maxes()
+    let program = PreviewSeed.program(maxes: maxes)
+
+    return ScrollView {
+        TodaySessionCard(program: program, day: program.orderedDays[0], maxes: maxes)
+            .padding()
+    }
+    .background(Theme.Colors.canvas)
+}

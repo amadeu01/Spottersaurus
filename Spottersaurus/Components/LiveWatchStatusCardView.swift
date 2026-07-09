@@ -42,3 +42,29 @@ struct LiveWatchStatusCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+#Preview("Live tick") {
+    ScrollView {
+        LiveWatchStatusCardView(
+            tick: LiveTickEnvelope(repCount: 3, currentVelocityMS: 0.42, heartRateBPM: 132, elapsedSeconds: 18),
+            receivedAt: .now,
+            importMessage: "Last import: Bench Press · 5 reps",
+            connectionStatus: .connected
+        )
+        .padding()
+    }
+    .background(Theme.Colors.canvas)
+}
+
+#Preview("No live data") {
+    ScrollView {
+        LiveWatchStatusCardView(
+            tick: nil,
+            receivedAt: nil,
+            importMessage: "No sessions imported yet.",
+            connectionStatus: .pairedNotReachable
+        )
+        .padding()
+    }
+    .background(Theme.Colors.canvas)
+}

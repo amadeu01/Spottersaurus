@@ -15,3 +15,11 @@ struct HistoryMetricLineView: View {
         .font(.system(.body, design: .rounded, weight: .semibold))
     }
 }
+
+#Preview {
+    VStack(spacing: 12) {
+        HistoryMetricLineView(label: "SETS", value: "5")
+        HistoryMetricLineView(label: "TONNAGE", value: "2,340 kg")
+    }
+    .padding()
+}

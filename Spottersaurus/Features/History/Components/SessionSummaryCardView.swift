@@ -22,3 +22,15 @@ struct SessionSummaryCardView: View {
         }
     }
 }
+
+#Preview {
+    let viewModel = HistoryViewModel()
+    let session = PreviewSeed.workoutSession()
+    viewModel.update(with: [session])
+
+    return ScrollView {
+        SessionSummaryCardView(session: session, viewModel: viewModel)
+            .padding()
+    }
+    .background(Theme.Colors.canvas)
+}

@@ -15,3 +15,13 @@ struct HistorySessionRowView: View {
         }
     }
 }
+
+#Preview {
+    let viewModel = HistoryViewModel()
+    let session = PreviewSeed.workoutSession()
+    viewModel.update(with: [session])
+
+    return List {
+        HistorySessionRowView(session: session, viewModel: viewModel)
+    }
+}
