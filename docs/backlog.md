@@ -73,7 +73,7 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ### P15-S1 — Device-motion sample type — **M** (ADR 0007)
 
-- [ ] **P15-S1** `M` · Kit · **Add a fused device-motion sample type.**
+- [x] **P15-S1** `M` · Kit · **Add a fused device-motion sample type.** (2026-07-10)
   Goal: a pure Codable `DeviceMotionSample` (timestamp + `userAcceleration` xyz,
   `gravity` xyz, `rotationRate` xyz, `attitude` quaternion) beside `MotionSample`;
   a bar-axis front end that projects onto the supplied gravity vector (falls back
