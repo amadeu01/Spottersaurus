@@ -63,13 +63,39 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ### P15-D1 — Drop manual tap from live detection — **S**
 
-- [ ] **P15-D1** `S` · Kit · **Remove `manualTaps` from `SpotEngine`; squat
+- [x] **P15-D1** `S` · Kit · **Remove `manualTaps` from `SpotEngine`; squat (2026-07-10)
   Stage-2 = tempo-blowout OR (tempo + HR).** Goal: delete the `tapped` signal
   from `analyzeVelocityPath`/`analyzeTempoPath`; squat Stage 2 fires on
   `ratio > rackDurationMultiplier` alone OR (moderate blowout AND HR spike).
   Done-when: DetectionTests updated — a slow squat rep with no HR still reaches
   RACK IT; a tap no longer influences anything (param removed or ignored);
   `swift test` green.
+
+### P15-S1 — Device-motion sample type — **M** (ADR 0007)
+
+- [ ] **P15-S1** `M` · Kit · **Add a fused device-motion sample type.**
+  Goal: a pure Codable `DeviceMotionSample` (timestamp + `userAcceleration` xyz,
+  `gravity` xyz, `rotationRate` xyz, `attitude` quaternion) beside `MotionSample`;
+  a bar-axis front end that projects onto the supplied gravity vector (falls back
+  to `GravityRemover` EMA when only raw accel is available). Done-when: unit tests
+  cover projection-with-supplied-gravity vs EMA fallback on synthetic buffers;
+  `swift test` green.
+
+### P15-S2 — Watch feed uses `deviceMotionUpdates` — **M** (ADR 0007)
+
+- [ ] **P15-S2** `M` · Watch · **Stream fused device motion (200 Hz).**
+  Goal: `WatchMotionStreamAdapter` uses `CMBatchedSensorManager.deviceMotionUpdates()`
+  producing `DeviceMotionSample`; keep accelerometer + `CMMotionManager` fallbacks.
+  Done-when: builds; on-device the pipeline runs off fused motion. (Device-side —
+  Kit consumers carry the tests.)
+
+### P15-S3 — Rotation/attitude gating in detection — **M** (ADR 0007)
+
+- [ ] **P15-S3** `M` · Kit · **Use rotation/attitude to reject non-rep motion.**
+  Goal: `RepSegmenter`/`SpotEngine` use `rotationRate`/`attitude` to reject
+  walkout/torso-sway and improve the squat path + rep-1 gate. Done-when: a
+  synthetic walkout-with-rotation buffer yields no reps while clean vertical reps
+  still segment; `swift test` green. (Layers on P15-D2/D3.)
 
 ### P15-D2 — Settle + rep-1 gate in segmenter — **M**
 
