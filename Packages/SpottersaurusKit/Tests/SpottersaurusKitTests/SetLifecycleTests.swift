@@ -141,6 +141,65 @@ final class SetLifecycleTests: XCTestCase {
         XCTAssertEqual(controller.state, .repping)
     }
 
+    func test_resolvedSpotEventClearsAlertStageWhileRacked() {
+        var controller = SetLifecycleController()
+        controller.arm()
+        controller.repCompleted()
+        controller.handle(spotEvent: SpotEvent(kind: .rackIt, timestamp: 1.0, repIndex: 0, confidence: 0.95, reason: .sustainedPin))
+        controller.autoRack()
+        XCTAssertEqual(controller.state, .racked)
+        XCTAssertEqual(controller.alertStage, .rackIt)
+
+        controller.handle(spotEvent: SpotEvent(kind: .resolved, timestamp: 2.0, repIndex: 0, confidence: 0.5, reason: .lockout))
+        XCTAssertEqual(controller.alertStage, .none)
+        XCTAssertEqual(controller.state, .racked)
+    }
+
+    func test_resolvedSpotEventClearsAlertStageWhileResting() {
+        var controller = SetLifecycleController(restSeconds: 90)
+        controller.arm()
+        controller.repCompleted()
+        controller.handle(spotEvent: SpotEvent(kind: .rackIt, timestamp: 1.0, repIndex: 0, confidence: 0.95, reason: .sustainedPin))
+        controller.autoRack()
+        controller.restTick(elapsed: 0)
+        XCTAssertEqual(controller.state, .resting)
+        XCTAssertEqual(controller.alertStage, .rackIt)
+
+        controller.handle(spotEvent: SpotEvent(kind: .resolved, timestamp: 2.0, repIndex: 0, confidence: 0.5, reason: .lockout))
+        XCTAssertEqual(controller.alertStage, .none)
+        XCTAssertEqual(controller.state, .resting)
+    }
+
+    func test_resolvedSpotEventClearsAlertStageWhileComplete() {
+        var controller = SetLifecycleController(restSeconds: 90)
+        controller.arm()
+        controller.repCompleted()
+        controller.handle(spotEvent: SpotEvent(kind: .rackIt, timestamp: 1.0, repIndex: 0, confidence: 0.95, reason: .sustainedPin))
+        controller.autoRack()
+        controller.restTick(elapsed: 0)
+        controller.restTick(elapsed: 90)
+        XCTAssertEqual(controller.state, .complete)
+        XCTAssertEqual(controller.alertStage, .rackIt)
+
+        controller.handle(spotEvent: SpotEvent(kind: .resolved, timestamp: 91.0, repIndex: 0, confidence: 0.5, reason: .lockout))
+        XCTAssertEqual(controller.alertStage, .none)
+        XCTAssertEqual(controller.state, .complete)
+    }
+
+    func test_grindingAndRackItSpotEventsStillIgnoredOutsideRepping() {
+        var controller = SetLifecycleController(restSeconds: 90)
+        controller.arm()
+        controller.repCompleted()
+        controller.autoRack()
+        XCTAssertEqual(controller.state, .racked)
+
+        controller.handle(spotEvent: SpotEvent(kind: .grinding, timestamp: 1.0, repIndex: 0, confidence: 0.6, reason: .concentricTempo))
+        XCTAssertEqual(controller.alertStage, .none)
+
+        controller.handle(spotEvent: SpotEvent(kind: .rackIt, timestamp: 1.5, repIndex: 0, confidence: 0.95, reason: .sustainedPin))
+        XCTAssertEqual(controller.alertStage, .none)
+    }
+
     func test_spotEventWhileIdleIsIgnored() {
         var controller = SetLifecycleController()
         controller.handle(spotEvent: SpotEvent(kind: .grinding, timestamp: 1.0, repIndex: 0, confidence: 0.6, reason: .concentricTempo))

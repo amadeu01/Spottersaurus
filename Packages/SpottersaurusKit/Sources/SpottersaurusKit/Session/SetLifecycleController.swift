@@ -96,13 +96,19 @@ public struct SetLifecycleController: Sendable, Equatable {
     /// Surfaces a `SpotEngine` event as the alert sub-state. Independent of
     /// the main lifecycle: escalation never touches `state` or `repCount`, so
     /// a grind/rack-it/resolve sequence can play out mid-rep without derailing
-    /// counting. Only meaningful while a rep is actually in flight.
+    /// counting. Raising an alert (`.grinding`/`.rackIt`) is only meaningful
+    /// while a rep is actually in flight. Clearing one (`.resolved`) must work
+    /// from any state: once the bar is racked the lifecycle can move on to
+    /// `.resting`/`.complete` before the spot engine reports resolution, and a
+    /// stuck `.rackIt` alert must never survive past that point (see
+    /// docs/backlog.md P1-1a — a lifter must always be able to clear it).
     public mutating func handle(spotEvent: SpotEvent) {
-        guard state == .repping else { return }
         switch spotEvent.kind {
         case .grinding:
+            guard state == .repping else { return }
             alertStage = .grinding
         case .rackIt:
+            guard state == .repping else { return }
             alertStage = .rackIt
         case .resolved:
             alertStage = .none
