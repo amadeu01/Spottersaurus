@@ -45,6 +45,13 @@ final class LiveSetViewModel {
     private let telemetryBufferRetention: TimeInterval = 2
     private var repMetrics: [RepMetricEnvelope] = []
     private var spotEvents: [SpotEventEnvelope] = []
+    /// Dedups `SpotEngine`'s per-tick event stream before it reaches
+    /// `lifecycle.handle(...)`: `analysis.events` re-lists every event still
+    /// inside the rolling motion buffer on every batch, not just what's new,
+    /// so without this gate a single `.rackIt` would re-latch the alert right
+    /// after the lifter resolves it (docs/backlog.md P1-1c). Reset on `arm()`
+    /// so a new set's rep 0 isn't silenced by the previous set's history.
+    private var spotEventGate = SpotEventGate()
     private var setStartedAt: Date?
     private var processedRepCount = 0
     private var spotEngine: SpotEngine
@@ -223,6 +230,7 @@ final class LiveSetViewModel {
         heartRateSamples = []
         repMetrics = []
         spotEvents = []
+        spotEventGate.reset()
         setStartedAt = Date()
         processedRepCount = 0
     }
@@ -345,7 +353,11 @@ final class LiveSetViewModel {
             processedRepCount = rep.repIndex + 1
             velocityMS = max(0, rep.meanVelocityMS)
         }
-        for event in analysis.events {
+        // `analysis.events` re-lists every event still inside the rolling
+        // motion buffer on every tick, not just what's new since last time —
+        // gate it so a replayed `.rackIt` never re-latches an alert the
+        // lifter already resolved (docs/backlog.md P1-1c).
+        for event in spotEventGate.admitNew(from: analysis.events) {
             let envelope = SpotEventEnvelope(
                 stage: event.kind,
                 timestamp: event.timestamp,
