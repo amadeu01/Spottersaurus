@@ -7,11 +7,6 @@ import SpottersaurusKit
 final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     static let shared = WatchPlannedSessionStore()
 
-    private let payloadKey = "plannedSession"
-    private let liveTickKey = "liveTick"
-    private let commandKey = "watchCommand"
-    private let finishedSessionKey = "finishedSession"
-    private let lifecycleKey = "liveSetLifecycle"
     private let defaultsKey = "Spottersaurus.lastPlannedSession"
     private let lock = NSLock()
     private let encoder: JSONEncoder
@@ -95,7 +90,7 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         session?.delegate = self
         session?.activate()
         logger.info(.watchLink, "activated Watch WCSession supported=\(session != nil)")
-        if let data = session?.applicationContext[payloadKey] as? Data {
+        if let data = session?.applicationContext[WireKeys.plannedSession] as? Data {
             store(data)
         }
     }
@@ -169,16 +164,16 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     /// `WatchLink.session(_:didReceiveMessageData:)` decodes bare
     /// `LiveTickEnvelope`s with no key, so a raw lifecycle send there would
     /// risk being mis-decoded as a tick. The iPhone receiver for
-    /// `lifecycleKey` lands in L3; until then this is harmless —
-    /// `WatchLink.session(_:didReceiveMessage:)` simply finds no matching
-    /// key and no-ops.
+    /// `WireKeys.liveSetLifecycle` lands in L3; until then this is
+    /// harmless — `WatchLink.session(_:didReceiveMessage:)` simply finds no
+    /// matching key and no-ops.
     func send(lifecycle event: LiveSetLifecycleEnvelope) {
         guard let session, let data = try? encoder.encode(event) else {
             logger.error(.watchLink, "lifecycle event encode/send unavailable")
             return
         }
 
-        let payload = [lifecycleKey: data]
+        let payload = [WireKeys.liveSetLifecycle: data]
         if session.isReachable {
             logger.notice(.watchLink, "sending live set lifecycle event via reachable message")
             session.sendMessage(payload, replyHandler: nil) { [weak self] error in
@@ -197,7 +192,7 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
             return
         }
 
-        let payload = [finishedSessionKey: data]
+        let payload = [WireKeys.finishedSession: data]
         if session.isReachable {
             logger.notice(.watchLink, "sending finished session via reachable message id=\(envelope.id)")
             session.sendMessage(payload, replyHandler: nil) { [weak self] _ in
@@ -235,14 +230,14 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
-        if let data = applicationContext[payloadKey] as? Data {
+        if let data = applicationContext[WireKeys.plannedSession] as? Data {
             logger.info(.watchLink, "received planned session application context")
             store(data)
         }
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
-        if let data = userInfo[payloadKey] as? Data {
+        if let data = userInfo[WireKeys.plannedSession] as? Data {
             logger.info(.watchLink, "received planned session userInfo")
             store(data)
         }
@@ -258,9 +253,9 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         didReceiveMessage message: [String: Any],
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
-        if let data = message[commandKey] as? Data {
+        if let data = message[WireKeys.watchCommand] as? Data {
             receiveCommand(data)
-            replyHandler([commandKey: "ack"])
+            replyHandler([WireKeys.watchCommand: "ack"])
             return
         }
 
@@ -304,7 +299,7 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
 
     private func queueFinishedSession(_ data: Data, through session: WCSession) {
         logger.info(.watchLink, "transferring finished session userInfo bytes=\(data.count)")
-        session.transferUserInfo([finishedSessionKey: data])
+        session.transferUserInfo([WireKeys.finishedSession: data])
     }
 
     /// A live tick send completed successfully. Frees the coalescer's

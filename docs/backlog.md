@@ -59,7 +59,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (add date).
 
 ### P2-3 — Shared `WireKeys` — **S**
 
-- [ ] **P2-3** `S` · Kit + both apps · **`WireKeys` single source of truth.**
+- [x] **P2-3** `S` · Kit + both apps · **`WireKeys` single source of truth.** (2026-07-10)
   Goal: move the WCSession message-key literals into a Kit `WireKeys` enum; both
   targets reference it (removes the comment-synced duplication). Done-when: no
   string-literal keys remain in `WatchLink` / `WatchPlannedSessionStore`; a

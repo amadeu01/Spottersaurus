@@ -5,12 +5,6 @@ import SpottersaurusKit
 final class WatchLink: NSObject, WCSessionDelegate {
     static let shared = WatchLink()
 
-    private let payloadKey = "plannedSession"
-    private let commandKey = "watchCommand"
-    private let finishedSessionKey = "finishedSession"
-    /// Matches `WatchPlannedSessionStore.lifecycleKey` on the Watch side
-    /// exactly ("liveSetLifecycle") — see that file's `send(lifecycle:)`.
-    private let lifecycleKey = "liveSetLifecycle"
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let logger = LoggerGroup.iPhone
@@ -73,7 +67,7 @@ final class WatchLink: NSObject, WCSessionDelegate {
         }
 
         return await withCheckedContinuation { continuation in
-            session.sendMessage([commandKey: data]) { _ in
+            session.sendMessage([WireKeys.watchCommand: data]) { _ in
                 self.logger.notice(.watchLink, "watch command acknowledged kind=\(command.kind.rawValue)")
                 continuation.resume(returning: .sent)
             } errorHandler: { error in
@@ -120,11 +114,11 @@ final class WatchLink: NSObject, WCSessionDelegate {
         }
 
         do {
-            try session.updateApplicationContext([payloadKey: data])
+            try session.updateApplicationContext([WireKeys.plannedSession: data])
             logger.info(.watchLink, "queued planned session via application context bytes=\(data.count)")
             return .queued
         } catch {
-            session.transferUserInfo([payloadKey: data])
+            session.transferUserInfo([WireKeys.plannedSession: data])
             logger.warning(.watchLink, "application context failed; queued planned session userInfo: \(error.localizedDescription)")
             return .queued
         }
@@ -138,11 +132,11 @@ final class WatchLink: NSObject, WCSessionDelegate {
                 continuation.resume(returning: .sent)
             } errorHandler: { _ in
                 do {
-                    try session.updateApplicationContext([self.payloadKey: data])
+                    try session.updateApplicationContext([WireKeys.plannedSession: data])
                     self.logger.info(.watchLink, "planned session live send failed; queued application context")
                     continuation.resume(returning: .queued)
                 } catch {
-                    session.transferUserInfo([self.payloadKey: data])
+                    session.transferUserInfo([WireKeys.plannedSession: data])
                     self.logger.warning(.watchLink, "planned session live/context failed; queued userInfo: \(error.localizedDescription)")
                     continuation.resume(returning: .queued)
                 }
@@ -217,22 +211,22 @@ final class WatchLink: NSObject, WCSessionDelegate {
     }
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        if let data = message[finishedSessionKey] as? Data {
+        if let data = message[WireKeys.finishedSession] as? Data {
             logger.notice(.watchLink, "received finished session live message bytes=\(data.count)")
             receiveFinishedSession(data)
         }
-        if let data = message[lifecycleKey] as? Data {
+        if let data = message[WireKeys.liveSetLifecycle] as? Data {
             logger.notice(.watchLink, "received live set lifecycle live message bytes=\(data.count)")
             receiveLifecycle(data)
         }
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
-        if let data = userInfo[finishedSessionKey] as? Data {
+        if let data = userInfo[WireKeys.finishedSession] as? Data {
             logger.notice(.watchLink, "received finished session userInfo bytes=\(data.count)")
             receiveFinishedSession(data)
         }
-        if let data = userInfo[lifecycleKey] as? Data {
+        if let data = userInfo[WireKeys.liveSetLifecycle] as? Data {
             logger.notice(.watchLink, "received live set lifecycle userInfo bytes=\(data.count)")
             receiveLifecycle(data)
         }
