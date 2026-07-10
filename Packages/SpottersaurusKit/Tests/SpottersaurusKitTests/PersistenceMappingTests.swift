@@ -119,6 +119,51 @@ final class PersistenceMappingTests: XCTestCase {
         XCTAssertEqual(set.spotterEvents.map(\.repIndex), [0, 0])
     }
 
+    // MARK: manual resolve count
+
+    func testImportCarriesManualResolveCountFromEnvelopeToModel() throws {
+        let (_, context) = try makeContext()
+
+        let envelope = SessionEnvelope(
+            date: Date(timeIntervalSince1970: 1_700_000_000),
+            sets: [
+                CompletedSetEnvelope(
+                    lift: .bench,
+                    startedAt: Date(timeIntervalSince1970: 1_700_000_100),
+                    weightKg: 100,
+                    repsCompleted: 5,
+                    manualResolveCount: 2
+                ),
+            ]
+        )
+
+        let session = try SessionImporter.importSession(envelope, into: context)
+        let set = try XCTUnwrap(session.completedSets?.first)
+
+        XCTAssertEqual(set.manualResolveCount, 2)
+    }
+
+    func testImportDefaultsManualResolveCountToZeroWhenAbsentFromEnvelope() throws {
+        let (_, context) = try makeContext()
+
+        let envelope = SessionEnvelope(
+            date: Date(timeIntervalSince1970: 1_700_000_000),
+            sets: [
+                CompletedSetEnvelope(
+                    lift: .squat,
+                    startedAt: Date(timeIntervalSince1970: 1_700_000_100),
+                    weightKg: 140,
+                    repsCompleted: 5
+                ),
+            ]
+        )
+
+        let session = try SessionImporter.importSession(envelope, into: context)
+        let set = try XCTUnwrap(session.completedSets?.first)
+
+        XCTAssertEqual(set.manualResolveCount, 0)
+    }
+
     // MARK: idempotency
 
     func testReimportingSameEnvelopeIDDoesNotDuplicate() throws {

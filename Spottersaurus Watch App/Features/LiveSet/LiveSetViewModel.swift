@@ -319,6 +319,11 @@ final class LiveSetViewModel {
     }
 
     func resolveAlert() {
+        // TODO(P1-1d): increment a manualResolveCount counter here and thread
+        // it into finishedSessionEnvelope()'s CompletedSetEnvelope so a
+        // manual "Resolved" tap is persisted as a false-alarm signal
+        // (SpottersaurusKit's CompletedSetEnvelope.manualResolveCount /
+        // CompletedSet.manualResolveCount already support it end-to-end).
         lifecycle.handle(spotEvent: spotEvent(kind: .resolved, confidence: 1, reason: .manualTap))
     }
 

@@ -299,6 +299,11 @@ public struct CompletedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
     public var avgConcentricVelocityMS: Double
     /// Peak concentric velocity across the set, m/s (VBT).
     public var peakConcentricVelocityMS: Double
+    /// How many times the lifter manually tapped "Resolved" on a grinding /
+    /// RACK IT alert during this set — a false-alarm signal for later
+    /// detection tuning. Absent in older wire payloads, in which case it
+    /// decodes to 0 (see `init(from:)`).
+    public var manualResolveCount: Int
 
     public init(
         id: UUID = UUID(),
@@ -309,7 +314,8 @@ public struct CompletedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
         repMetrics: [RepMetricEnvelope] = [],
         spotEvents: [SpotEventEnvelope] = [],
         avgConcentricVelocityMS: Double = 0,
-        peakConcentricVelocityMS: Double = 0
+        peakConcentricVelocityMS: Double = 0,
+        manualResolveCount: Int = 0
     ) {
         self.id = id
         self.lift = lift
@@ -320,6 +326,29 @@ public struct CompletedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
         self.spotEvents = spotEvents
         self.avgConcentricVelocityMS = avgConcentricVelocityMS
         self.peakConcentricVelocityMS = peakConcentricVelocityMS
+        self.manualResolveCount = manualResolveCount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, lift, startedAt, weightKg, repsCompleted, repMetrics, spotEvents
+        case avgConcentricVelocityMS, peakConcentricVelocityMS, manualResolveCount
+    }
+
+    /// Hand-written so older wire payloads (Watch app builds predating this
+    /// field) still decode cleanly — `manualResolveCount` defaults to 0 when
+    /// the key is absent, rather than failing the whole envelope.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        lift = try container.decode(LiftKind.self, forKey: .lift)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        weightKg = try container.decode(Double.self, forKey: .weightKg)
+        repsCompleted = try container.decode(Int.self, forKey: .repsCompleted)
+        repMetrics = try container.decode([RepMetricEnvelope].self, forKey: .repMetrics)
+        spotEvents = try container.decode([SpotEventEnvelope].self, forKey: .spotEvents)
+        avgConcentricVelocityMS = try container.decode(Double.self, forKey: .avgConcentricVelocityMS)
+        peakConcentricVelocityMS = try container.decode(Double.self, forKey: .peakConcentricVelocityMS)
+        manualResolveCount = try container.decodeIfPresent(Int.self, forKey: .manualResolveCount) ?? 0
     }
 
     /// Estimated 1RM (kg) for this set via Epley — reuses the single-sourced

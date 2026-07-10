@@ -31,16 +31,16 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (add date).
   Goal: `.resolved` clears `alertStage` regardless of `state` (currently guarded
   to `.repping`). Done-when: unit tests prove resolve clears from `.racked`,
   `.resting`, `.complete`; existing tests green.
-- [ ] **P1-1b** `S` · Kit · **SetLifecycleController: auto-clear on auto-rack.**
+- [x] **P1-1b** `S` · Kit · **SetLifecycleController: auto-clear on auto-rack.** (2026-07-10)
   Goal: `autoRack()` also resets `alertStage` to `.none` (bar settled ⇒ danger
   over). Done-when: test asserts a `.rackIt` stage clears on `autoRack()`.
-- [ ] **P1-1c** `M` · Watch · **LiveSetViewModel: high-water-mark event feed.**
+- [x] **P1-1c** `M` · Watch · **LiveSetViewModel: high-water-mark event feed.** (2026-07-10)
   Goal: only *new* `SpotEngine` events reach `lifecycle.handle(...)` — stop
   replaying the whole `analysis.events` buffer each tick (mirror the existing
   `spotEvents` dedup). Done-when: a test-double SpotEngine returning the same
   event twice raises the alert once; after `resolveAlert()` the same event does
   **not** re-raise, but a genuinely new event does.
-- [ ] **P1-1d** `S` · Kit · **CompletedSet: resolve/false-alarm marker.**
+- [x] **P1-1d** `S` · Kit · **CompletedSet: resolve/false-alarm marker.** (2026-07-10)
   Goal: record a manual-resolve marker on the completed set for later tuning.
   Done-when: envelope + model round-trip test covers the new field.
 

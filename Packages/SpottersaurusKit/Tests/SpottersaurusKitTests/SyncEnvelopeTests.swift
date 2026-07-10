@@ -259,6 +259,54 @@ final class SyncEnvelopeTests: XCTestCase {
         XCTAssertEqual(legacy.peakConcentricVelocityMS, 0)
     }
 
+    /// `manualResolveCount` defaults to 0 and round-trips like any other
+    /// field when present in the wire payload.
+    func testCompletedSetEnvelopeManualResolveCountDefaultsToZeroAndRoundTrips() throws {
+        let legacy = CompletedSetEnvelope(
+            lift: .bench,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            weightKg: 100,
+            repsCompleted: 3
+        )
+        XCTAssertEqual(legacy.manualResolveCount, 0)
+
+        let resolved = CompletedSetEnvelope(
+            lift: .bench,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            weightKg: 100,
+            repsCompleted: 3,
+            manualResolveCount: 2
+        )
+        let decoded = try roundTrip(resolved)
+        XCTAssertEqual(decoded, resolved)
+        XCTAssertEqual(decoded.manualResolveCount, 2)
+    }
+
+    /// Older Watch app builds shipped `CompletedSetEnvelope` JSON without a
+    /// `manualResolveCount` key at all — decoding that payload must not
+    /// throw, and the field must default to 0 rather than dropping the set.
+    func testCompletedSetEnvelopeDecodesOlderJSONWithoutManualResolveCount() throws {
+        let json = """
+        {
+            "id": "6C2C1F2A-9B3E-4A9C-9C1A-9E6F9A1B2C3D",
+            "lift": "bench",
+            "startedAt": "2023-11-14T22:13:20Z",
+            "weightKg": 100,
+            "repsCompleted": 3,
+            "repMetrics": [],
+            "spotEvents": [],
+            "avgConcentricVelocityMS": 0,
+            "peakConcentricVelocityMS": 0
+        }
+        """
+        let (_, decoder) = makeCoders()
+        let decoded = try decoder.decode(CompletedSetEnvelope.self, from: Data(json.utf8))
+
+        XCTAssertEqual(decoded.manualResolveCount, 0)
+        XCTAssertEqual(decoded.weightKg, 100)
+        XCTAssertEqual(decoded.repsCompleted, 3)
+    }
+
     func testCompletedSetEnvelopeRoundTripsWithRepMetricsAndSpotEvents() throws {
         let set = CompletedSetEnvelope(
             lift: .bench,

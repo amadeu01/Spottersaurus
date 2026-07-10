@@ -59,6 +59,7 @@ public enum SessionImporter {
             startedAt: envelope.startedAt,
             avgConcentricVelocityMS: envelope.avgConcentricVelocityMS,
             peakConcentricVelocityMS: envelope.peakConcentricVelocityMS,
+            manualResolveCount: envelope.manualResolveCount,
             id: envelope.id
         )
         set.repMetrics = envelope.repMetrics.map(makeRepMetric)

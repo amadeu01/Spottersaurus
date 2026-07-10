@@ -65,6 +65,11 @@ public final class CompletedSet {
     public var peakConcentricVelocityMS: Double = 0
     /// Spotter escalations that fired, stored inline as a Codable attribute.
     public var spotterEvents: [SpotterEvent] = []
+    /// How many times the lifter manually tapped "Resolved" on a grinding /
+    /// RACK IT alert during this set. A valuable false-alarm signal for later
+    /// detection tuning — a count rather than a bool since repeated dismissals
+    /// within one set are more informative than a single flag.
+    public var manualResolveCount: Int = 0
 
     /// The owning session (inverse of `WorkoutSession.completedSets`).
     public var session: WorkoutSession?
@@ -84,6 +89,7 @@ public final class CompletedSet {
         avgConcentricVelocityMS: Double = 0,
         peakConcentricVelocityMS: Double = 0,
         spotterEvents: [SpotterEvent] = [],
+        manualResolveCount: Int = 0,
         id: UUID = UUID()
     ) {
         self.id = id
@@ -94,6 +100,7 @@ public final class CompletedSet {
         self.avgConcentricVelocityMS = avgConcentricVelocityMS
         self.peakConcentricVelocityMS = peakConcentricVelocityMS
         self.spotterEvents = spotterEvents
+        self.manualResolveCount = manualResolveCount
     }
 
     /// Estimated 1RM (kg) for this set via Epley. Derived, never stored.
