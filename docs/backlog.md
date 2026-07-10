@@ -55,6 +55,48 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (add date).
 
 ---
 
+## Phase 1.5 — Detection realism (hands-locked reality)
+
+Pure `Detection` changes from ADR 0005 (no mid-rep manual input) and ADR 0006
+(unrack/setup phase). All Kit-testable on macOS — high value, since without them
+the walkout counts as a rep and squat leans on an impossible tap.
+
+### P15-D1 — Drop manual tap from live detection — **S**
+
+- [ ] **P15-D1** `S` · Kit · **Remove `manualTaps` from `SpotEngine`; squat
+  Stage-2 = tempo-blowout OR (tempo + HR).** Goal: delete the `tapped` signal
+  from `analyzeVelocityPath`/`analyzeTempoPath`; squat Stage 2 fires on
+  `ratio > rackDurationMultiplier` alone OR (moderate blowout AND HR spike).
+  Done-when: DetectionTests updated — a slow squat rep with no HR still reaches
+  RACK IT; a tap no longer influences anything (param removed or ignored);
+  `swift test` green.
+
+### P15-D2 — Settle + rep-1 gate in segmenter — **M**
+
+- [ ] **P15-D2** `M` · Kit · **Ignore setup motion; gate rep 1 per lift.**
+  Goal: `RepSegmenter` ignores pre-settle motion and gates the first rep on the
+  lift-appropriate pattern (eccentric→concentric for squat/bench;
+  concentric-from-rest for deadlift). Done-when: synthetic buffer with a walkout
+  + N clean reps yields exactly N reps; deadlift-from-floor buffer counts rep 1;
+  `swift test` green.
+
+### P15-D3 — `.settling` lifecycle state — **S**
+
+- [ ] **P15-D3** `S` · Kit · **`SetLifecycleController`: add `.settling`.**
+  Goal: `armed → settling → repping`; motion during `.settling` isn't a rep;
+  transition driven by the segmenter's rep-1 gate. Done-when: state-transition
+  tests cover armed→settling→repping and that a walkout in `.settling` doesn't
+  advance repCount; `swift test` green.
+
+### P15-D4 — Wire Watch flow + remove grind-tap UI — **S**
+
+- [ ] **P15-D4** `S` · Watch · **`LiveSetViewModel` setup flow.** Goal: `arm()`
+  enters `.settling`; auto-advance to live on the first gated rep; remove/repurpose
+  any live "grind tap" affordance (`flagGrinding`/`rackIt`/controls) to match
+  ADR 0005. Done-when: builds; Kit-side logic already covered by D1–D3.
+
+---
+
 ## Phase 2 — Restructure transport & sync
 
 ### P2-3 — Shared `WireKeys` — **S**
