@@ -44,12 +44,14 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (add date).
   Goal: record a manual-resolve marker on the completed set for later tuning.
   Done-when: envelope + model round-trip test covers the new field.
 
-### P1-2 — Watch reconnect hardening — **S**
+### P1-2 — Watch reconnect hardening — ~~S~~ **moved to P2-8b**
 
-- [ ] **P1-2** `S` · Watch · **Watch adapter re-activates on deactivate.**
-  Goal: add the `sessionDidDeactivate` → `activate()` path the Watch side lacks
-  (iPhone already has it). Done-when: manual on-device reconnect works; keep the
-  reconnect card.
+- [x] **P1-2** — ~~Watch adapter re-activates on `sessionDidDeactivate`.~~
+  **Struck:** `sessionDidDeactivate` / `sessionDidBecomeInactive` are **iOS-only**
+  WatchConnectivity delegate methods (paired-watch switching); they don't exist on
+  watchOS, so this literal task is a no-op there. The genuine work —
+  "auto-reactivate on activation failure" — is folded into **P2-8b** (keepalive),
+  where both adapters' reactivation is handled together. (2026-07-10)
 
 ---
 
@@ -112,9 +114,13 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (add date).
 - [ ] **P2-8a** `M` · Kit · **Heartbeat-recency liveness.**
   Goal: derive "live" from heartbeat recency, not raw `isReachable`; feed
   `ConnectionStatus`. Done-when: reducer tests for blip-tolerance + stale window.
-- [ ] **P2-8b** `M` · Watch · **`HKWorkoutSession` keepalive guarantee.**
-  Goal: workout session spans the whole block; both adapters auto-reactivate.
-  Done-when: on-device session survives fg/bg without a false drop.
+- [ ] **P2-8b** `M` · Watch + iPhone · **`HKWorkoutSession` keepalive + reactivation.**
+  Goal: workout session spans the whole block; **both adapters auto-reactivate on
+  activation failure/error** (absorbs the real intent of P1-2 — note watchOS has
+  no `sessionDidDeactivate`, so reactivate off activation-error /
+  `activationDidComplete`, not the iOS-only deactivate callbacks). Done-when:
+  on-device session survives fg/bg without a false drop; a forced re-activation
+  recovers the link.
 
 ### P2-9 — iPhone launches Watch — **M**
 
