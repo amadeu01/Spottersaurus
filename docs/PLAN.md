@@ -65,6 +65,9 @@ Post-restructure shape (ADR 0002):
 
 ## Roadmap — stabilize → restructure → calibration → finish
 
+> Sized, agent-deliverable task breakdown (S/M/L/XL, `/tdd`-validated, one commit
+> per task) is in [`backlog.md`](backlog.md).
+
 ### Phase 1 — Stabilize (safety-critical, ships first)
 
 Small, targeted patches on the current structure so lifters can bail safely
