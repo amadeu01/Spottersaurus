@@ -188,17 +188,41 @@ final class DetectionTests: XCTestCase {
         XCTAssertTrue(analysis.reps.contains { $0.reachedRackIt })
     }
 
-    // MARK: - Engine: squat path (no velocity)
+    // MARK: - Engine: squat path (no velocity, no mid-rep manual input — ADR 0005)
 
-    func testSquatUsesTempoHRTapNotVelocity() {
-        // Warmup baseline for squat tempo.
-        let calib = Calibration().calibrate(lift: .squat, warmupMotion: cleanSet(reps: 3, amplitude: 0.4, concentric: 0.9))
+    private func squatCalibration() -> CalibrationValues {
+        Calibration().calibrate(lift: .squat, warmupMotion: cleanSet(reps: 3, amplitude: 0.4, concentric: 0.9))
+    }
 
-        // A slow squat rep with a manual grind tap + an HR spike during the rep.
+    /// An extreme tempo blowout (ratio past `rackDurationMultiplier`) must
+    /// reach RACK IT entirely on its own — no HR, no tap (there is no tap).
+    func testSquatExtremeTempoBlowoutFiresRackItWithNoHR() {
+        let calib = squatCalibration()
+
         var b = MotionBuilder()
         b.still(0.4)
         b.bump(amplitude: -0.4, duration: 0.9)   // eccentric
-        b.bump(amplitude: 0.3, duration: 1.6)    // slow concentric (tempo grind)
+        b.bump(amplitude: 0.6, duration: 2.2)    // extreme tempo blowout: ratio well past T2
+        b.still(0.4)
+
+        let engine = SpotEngine(lift: .squat, calibration: calib)
+        let analysis = engine.process(motion: b.samples) // no hr at all
+
+        XCTAssertFalse(analysis.usedVelocityPath, "squat must NOT use the velocity path")
+        XCTAssertTrue(analysis.events.contains { $0.kind == .grinding }, "extreme tempo blowout must fire Stage 1")
+        XCTAssertTrue(analysis.events.contains { $0.kind == .rackIt }, "an extreme blowout alone must escalate to RACK IT with zero HR data")
+        XCTAssertEqual(analysis.events.first { $0.kind == .rackIt }?.reason, .sustainedPin, "driven by tempo alone, not HR")
+    }
+
+    /// A moderate tempo blowout (past T1 but not past T2) needs the
+    /// corroborating HR spike to escalate; tempo alone would only be Stage 1.
+    func testSquatModerateTempoWithHRSpikeFiresRackIt() {
+        let calib = squatCalibration()
+
+        var b = MotionBuilder()
+        b.still(0.4)
+        b.bump(amplitude: -0.4, duration: 0.9)   // eccentric
+        b.bump(amplitude: 0.3, duration: 1.6)    // moderate tempo grind: ratio ≈ 1.78
         b.still(0.4)
         let motion = b.samples
 
@@ -208,13 +232,28 @@ final class DetectionTests: XCTestCase {
             HRSample(timestamp: 1.6, beatsPerMinute: 162),
             HRSample(timestamp: 2.2, beatsPerMinute: 168),
         ]
-        let taps: [TimeInterval] = [2.0]
 
         let engine = SpotEngine(lift: .squat, calibration: calib)
-        let analysis = engine.process(motion: motion, hr: hr, manualTaps: taps)
+        let analysis = engine.process(motion: motion, hr: hr)
 
         XCTAssertFalse(analysis.usedVelocityPath, "squat must NOT use the velocity path")
-        XCTAssertTrue(analysis.events.contains { $0.kind == .grinding }, "squat tempo/HR/tap must fire Stage 1")
+        XCTAssertTrue(analysis.events.contains { $0.kind == .grinding }, "moderate tempo drift must fire Stage 1")
+        XCTAssertTrue(analysis.events.contains { $0.kind == .rackIt }, "moderate tempo + HR spike must escalate to RACK IT")
+        XCTAssertEqual(analysis.events.first { $0.kind == .rackIt }?.reason, .hrSpike, "the HR spike is what tipped this one")
+    }
+
+    /// A clean squat rep at normal tempo with no HR spike must stay silent —
+    /// the false-alarm guard, now with no manual tap to lean on either.
+    func testSquatCleanRepStaysSilent() {
+        let calib = squatCalibration()
+        let motion = cleanSet(reps: 3, amplitude: 0.4, concentric: 0.9)
+
+        let engine = SpotEngine(lift: .squat, calibration: calib)
+        let analysis = engine.process(motion: motion)
+
+        XCTAssertFalse(analysis.usedVelocityPath, "squat must NOT use the velocity path")
+        XCTAssertTrue(analysis.events.isEmpty, "a clean squat set must not fire any event; got \(analysis.events)")
+        XCTAssertFalse(analysis.reps.contains { $0.flaggedStall })
         // The velocity path is disabled: no VBT numbers should be reported.
         XCTAssertTrue(analysis.reps.allSatisfy { $0.meanVelocityMS == 0 && $0.peakVelocityMS == 0 })
     }

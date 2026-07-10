@@ -13,9 +13,12 @@
 //  lockout inside the max-concentric window (> T2 × baseline).
 //
 //  Wrist-tracked lifts (bench, deadlift) use the velocity path. Back-loaded
-//  lifts (squat) disable velocity entirely and fall back to rep tempo, an
-//  injected HR-spike signal, and a manual grind tap. Defaults are conservative:
-//  prefer missing a borderline rep over startling a lifter mid-clean-rep.
+//  lifts (squat) disable velocity entirely and fall back to rep tempo plus an
+//  injected HR-spike signal — there is no mid-rep manual input (ADR 0005): a
+//  lifter's hands are locked on the bar for the entire working set, so a
+//  "grind tap" gesture is physically impossible during a rep. Defaults are
+//  conservative: prefer missing a borderline rep over startling a lifter
+//  mid-clean-rep.
 //
 
 import Foundation
@@ -107,6 +110,8 @@ public enum SpotReason: String, Sendable, Codable, Equatable {
     case sustainedPin
     case tempoCadence
     case hrSpike
+    /// Not a live detection input (ADR 0005 — hands are locked on the bar
+    /// mid-rep); reserved for a between-sets manual dismiss/tuning action.
     case manualTap
     case lockout
 }
@@ -190,8 +195,7 @@ public struct SpotEngine: Sendable {
     /// the event stream plus per-rep metrics.
     public func process(
         motion: [MotionSample],
-        hr: [HRSample] = [],
-        manualTaps: [TimeInterval] = []
+        hr: [HRSample] = []
     ) -> SpotAnalysis {
         let linear = GravityRemover.axialAcceleration(motion, timeConstant: config.gravityTimeConstant)
         let phases = RepSegmenter(config: config).segment(linear)
@@ -207,9 +211,9 @@ public struct SpotEngine: Sendable {
         for phase in phases {
             let (evs, rep): ([SpotEvent], RepResult)
             if usesVelocity {
-                (evs, rep) = analyzeVelocityPath(phase: phase, linear: linear, integrator: integrator, manualTaps: manualTaps)
+                (evs, rep) = analyzeVelocityPath(phase: phase, linear: linear, integrator: integrator)
             } else {
-                (evs, rep) = analyzeTempoPath(phase: phase, hr: hr, baseHR: baseHR, manualTaps: manualTaps)
+                (evs, rep) = analyzeTempoPath(phase: phase, hr: hr, baseHR: baseHR)
             }
             events.append(contentsOf: evs)
             reps.append(rep)
@@ -223,8 +227,7 @@ public struct SpotEngine: Sendable {
     private func analyzeVelocityPath(
         phase: RepPhase,
         linear: [LinearSample],
-        integrator: VelocityIntegrator,
-        manualTaps: [TimeInterval]
+        integrator: VelocityIntegrator
     ) -> ([SpotEvent], RepResult) {
         let cv = integrator.integrate(linear, over: phase)
         let duration = phase.concentricSeconds
@@ -232,13 +235,10 @@ public struct SpotEngine: Sendable {
         let ratio = duration / baseline
         let bandLower = calibration.velocityBandLowerMS
 
-        // A manual tap inside the rep is the lifter telling us directly.
-        let tapped = manualTaps.contains { $0 >= (phase.eccentricStart ?? phase.concentricStart) - 0.05 && $0 <= phase.concentricEnd + 0.05 }
-
         // Stage 1: slow concentric OR mean velocity collapsed below the band.
         let slow = ratio > config.grindDurationMultiplier
         let weak = bandLower > 0 && cv.meanMS < bandLower
-        let stage1 = slow || weak || tapped
+        let stage1 = slow || weak
 
         // Stage 2: a sustained near-zero stall AND no lockout within the window.
         let (stallSeconds, stallEnd) = longestNearZeroRun(cv.series)
@@ -248,13 +248,13 @@ public struct SpotEngine: Sendable {
 
         var events: [SpotEvent] = []
         if stage1 {
-            let reason: SpotReason = tapped ? .manualTap : (weak ? .velocityStall : .concentricTempo)
+            let reason: SpotReason = weak ? .velocityStall : .concentricTempo
             events.append(
                 SpotEvent(
                     kind: .grinding,
                     timestamp: stage1FireTime(phase: phase, baseline: baseline),
                     repIndex: phase.index,
-                    confidence: grindConfidence(ratio: ratio, weak: weak, tapped: tapped),
+                    confidence: grindConfidence(ratio: ratio, weak: weak),
                     reason: reason
                 )
             )
@@ -298,8 +298,7 @@ public struct SpotEngine: Sendable {
     private func analyzeTempoPath(
         phase: RepPhase,
         hr: [HRSample],
-        baseHR: Double,
-        manualTaps: [TimeInterval]
+        baseHR: Double
     ) -> ([SpotEvent], RepResult) {
         let duration = phase.concentricSeconds
         let baseline = Swift.max(calibration.baselineConcentricSeconds, 1e-3)
@@ -307,26 +306,27 @@ public struct SpotEngine: Sendable {
 
         let repStart = phase.eccentricStart ?? phase.concentricStart
         let repEnd = phase.concentricEnd
-        let tapped = manualTaps.contains { $0 >= repStart - 0.05 && $0 <= repEnd + 0.05 }
         let hrSpike = hrSpiked(hr, from: repStart, to: repEnd, baseHR: baseHR)
 
-        // Stage 1: tempo drift past T1, or a manual grind tap. HR alone is too
-        // noisy to fire on; it only corroborates an escalation.
+        // Stage 1: tempo drift past T1. HR alone is too noisy to fire on; it
+        // only corroborates an escalation.
         let slow = ratio > config.grindDurationMultiplier
-        let stage1 = slow || tapped
-        // Stage 2: tempo blown out past T2 and a corroborating strain signal.
-        let stage2 = stage1 && ratio > config.rackDurationMultiplier && (hrSpike || tapped)
+        let stage1 = slow
+        // Stage 2: an extreme tempo blowout alone is unambiguous enough to
+        // fire with no other signal; a merely moderate blowout (past T1 but
+        // not yet past T2) needs a corroborating HR spike. No mid-rep manual
+        // input exists (ADR 0005) — the lifter's hands are locked on the bar.
+        let stage2 = stage1 && (ratio > config.rackDurationMultiplier || hrSpike)
 
         var events: [SpotEvent] = []
         if stage1 {
-            let reason: SpotReason = tapped ? .manualTap : .tempoCadence
             events.append(
                 SpotEvent(
                     kind: .grinding,
                     timestamp: stage1FireTime(phase: phase, baseline: baseline),
                     repIndex: phase.index,
-                    confidence: grindConfidence(ratio: ratio, weak: false, tapped: tapped),
-                    reason: reason
+                    confidence: grindConfidence(ratio: ratio, weak: false),
+                    reason: .tempoCadence
                 )
             )
             if stage2 {
@@ -336,7 +336,10 @@ public struct SpotEngine: Sendable {
                         timestamp: repEnd,
                         repIndex: phase.index,
                         confidence: rackConfidence(stallSeconds: config.sustainedStallSeconds, ratio: ratio),
-                        reason: hrSpike ? .hrSpike : .sustainedPin
+                        // Tempo alone is the extreme, unambiguous case; if it
+                        // wasn't extreme enough on its own, the HR spike is
+                        // what tipped it.
+                        reason: ratio > config.rackDurationMultiplier ? .sustainedPin : .hrSpike
                     )
                 )
             } else {
@@ -393,8 +396,7 @@ public struct SpotEngine: Sendable {
         Swift.min(phase.concentricStart + baseline * config.grindDurationMultiplier, phase.concentricEnd)
     }
 
-    private func grindConfidence(ratio: Double, weak: Bool, tapped: Bool) -> Double {
-        if tapped { return 0.7 }
+    private func grindConfidence(ratio: Double, weak: Bool) -> Double {
         var c = 0.5 + Swift.min(0.3, Swift.max(0, ratio - config.grindDurationMultiplier) * 0.5)
         if weak { c = Swift.max(c, 0.6) }
         return Swift.min(0.85, c)
