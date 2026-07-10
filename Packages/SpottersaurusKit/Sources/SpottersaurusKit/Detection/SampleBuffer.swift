@@ -22,6 +22,7 @@ public protocol Timestamped {
 
 extension MotionSample: Timestamped {}
 extension HRSample: Timestamped {}
+extension DeviceMotionSample: Timestamped {}
 
 /// A single bar-axis (vertical) linear-acceleration reading, gravity removed,
 /// in m/s². Positive points along the lift's concentric direction (up).
@@ -124,5 +125,31 @@ public enum GravityRemover {
             prevT = s.timestamp
         }
         return out
+    }
+
+    /// Projects fused device-motion `userAcceleration` onto the CoreMotion-
+    /// supplied `gravity` vector to recover bar-axis linear acceleration —
+    /// the ADR 0007 fused front end.
+    ///
+    /// Unlike `axialAcceleration(_:timeConstant:)`, gravity here comes
+    /// straight from CoreMotion's sensor fusion (accelerometer + gyroscope)
+    /// per sample, so there is no EMA to settle and no rep-signal attenuation
+    /// from an estimate lagging behind a genuinely inclined bar path.
+    ///
+    /// Sign: CoreMotion's `gravity` vector points in the direction gravity
+    /// pulls — toward the ground, e.g. ~(0, 0, -1) for a device lying
+    /// screen-up flat — which is the *opposite* sense from the raw front
+    /// end's EMA estimate (which tracks the raw accelerometer's at-rest
+    /// reading and therefore points up, ~(0, 0, +1) in the same pose). The
+    /// bar's "up"/concentric direction is `-gravity` (normalized), so this
+    /// negates the projection onto the gravity vector to land on the same
+    /// up-positive convention `LinearSample.axialMS2` documents and the raw
+    /// front end already produces.
+    public static func axialAcceleration(deviceMotion: [DeviceMotionSample]) -> [LinearSample] {
+        deviceMotion.map { sample in
+            let gHat = sample.gravityG.normalized
+            let axialG = -sample.userAccelerationG.dot(gHat)
+            return LinearSample(timestamp: sample.timestamp, axialMS2: axialG * standardGravityMS2)
+        }
     }
 }
