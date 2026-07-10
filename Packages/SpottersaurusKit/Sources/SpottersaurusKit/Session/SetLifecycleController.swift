@@ -3,8 +3,9 @@
 //  SpottersaurusKit
 //
 //  The pure, platform-neutral state machine that sequences one working set:
-//  arm → reps → auto-rack (motion settle) → rest → next (see docs/PLAN.md,
-//  "Watch app / Session lifecycle"). This is the logic layer the watchOS
+//  arm → settle (unrack/walkout/brace) → reps → auto-rack (motion settle) →
+//  rest → next (see docs/PLAN.md, "Watch app / Session lifecycle", and
+//  docs/adr/0006-unrack-setup-phase.md). This is the logic layer the watchOS
 //  session engine (Phase 4a/4b, hardware) drives; it takes already-parsed
 //  high-level inputs (arm/rep/rack/rest-tick/SpotEvent) and never touches
 //  CoreMotion, HealthKit, SwiftUI, or WorkoutKit. Time is always injected —
@@ -16,7 +17,20 @@ import Foundation
 /// The main lifecycle state of a working set, in PLAN vocabulary.
 public enum SetLifecycleState: Sendable, Equatable {
     case idle
-    case armed
+    /// Start has been pressed: the lifter is unracking / walking out / lifting
+    /// off / bracing. Real motion, but not a rep (ADR 0006 — "Unrack / setup
+    /// phase before rep detection"). There is no separate hands-free "I'm set"
+    /// press (by the time the lifter is braced, hands are already locked on
+    /// the bar), so `arm()` lands directly here rather than in a distinct
+    /// "armed, setup not yet begun" state that nothing would ever observe —
+    /// keeping a state around that's never independently true would make the
+    /// machine dishonest about what's actually detectable. The `RepSegmenter`
+    /// (P15-D2) gates the first rep on the lift-appropriate pattern upstream
+    /// (squat/bench: first eccentric→concentric excursion; deadlift: first
+    /// sustained concentric-from-rest excursion); this controller only needs
+    /// to know that the first `repCompleted()` call is the signal setup is
+    /// over — it stays a pure reducer with no timers of its own.
+    case settling
     case repping
     case racked
     case resting
@@ -48,21 +62,26 @@ public struct SetLifecycleController: Sendable, Equatable {
         self.restSeconds = restSeconds
     }
 
-    /// Arms the next working set. Valid from `.idle` (first set) or
-    /// `.complete` (the previous set finished its rest); resets rep count and
-    /// any lingering alert. Ignored from any other state.
+    /// Arms the next working set — the lifter has pressed Start and is now
+    /// unracking/walking out/bracing (ADR 0006). Valid from `.idle` (first
+    /// set) or `.complete` (the previous set finished its rest); resets rep
+    /// count and any lingering alert. Ignored from any other state. Lands in
+    /// `.settling`, not `.repping`: motion during setup must not be counted
+    /// as reps (the segmenter's per-lift rep-1 gate, P15-D2, is what makes
+    /// that motion safe to observe upstream at all).
     public mutating func arm() {
         guard state == .idle || state == .complete else { return }
-        state = .armed
+        state = .settling
         repCount = 0
         alertStage = .none
     }
 
     /// A completed rep, reported by the RepSegmenter-driven session engine.
-    /// Valid from `.armed` (the first rep of the set) or `.repping`
-    /// (subsequent reps); ignored otherwise (e.g. a stray rep while idle).
+    /// Valid from `.settling` (the segmenter's gated first rep — setup is
+    /// over, this is rep 1) or `.repping` (subsequent reps); ignored
+    /// otherwise (e.g. a stray rep while idle).
     public mutating func repCompleted() {
-        guard state == .armed || state == .repping else { return }
+        guard state == .settling || state == .repping else { return }
         repCount += 1
         state = .repping
     }

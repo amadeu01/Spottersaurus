@@ -99,7 +99,7 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ### P15-D2 — Settle + rep-1 gate in segmenter — **M**
 
-- [ ] **P15-D2** `M` · Kit · **Ignore setup motion; gate rep 1 per lift.**
+- [x] **P15-D2** `M` · Kit · **Ignore setup motion; gate rep 1 per lift.** (2026-07-10)
   Goal: `RepSegmenter` ignores pre-settle motion and gates the first rep on the
   lift-appropriate pattern (eccentric→concentric for squat/bench;
   concentric-from-rest for deadlift). Done-when: synthetic buffer with a walkout
@@ -108,11 +108,16 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ### P15-D3 — `.settling` lifecycle state — **S**
 
-- [ ] **P15-D3** `S` · Kit · **`SetLifecycleController`: add `.settling`.**
+- [x] **P15-D3** `S` · Kit · **`SetLifecycleController`: add `.settling`.** (2026-07-10)
   Goal: `armed → settling → repping`; motion during `.settling` isn't a rep;
   transition driven by the segmenter's rep-1 gate. Done-when: state-transition
   tests cover armed→settling→repping and that a walkout in `.settling` doesn't
-  advance repCount; `swift test` green.
+  advance repCount; `swift test` green. Landed as `arm() → .settling` directly
+  (no reachable `.armed` state remained — no separate hands-free "I'm set"
+  press per ADR 0006 — so `.armed` was removed from `SetLifecycleState` rather
+  than kept dead alongside `.settling`). Watch VM/View/Controls call sites that
+  still switch on `.armed` (`LiveSetViewModel.swift`, `LiveSetView.swift`,
+  `LiveSetControlsView.swift`) are now stale pending P15-D4.
 
 ### P15-D4 — Wire Watch flow + remove grind-tap UI — **S**
 

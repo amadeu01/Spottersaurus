@@ -19,13 +19,27 @@ final class SetLifecycleTests: XCTestCase {
         XCTAssertEqual(controller.alertStage, .none)
     }
 
-    func test_armFromIdleTransitionsToArmed() {
+    func test_armFromIdleTransitionsToSettling() {
+        // ADR 0006: Start begins the unrack/walkout/brace setup phase, not
+        // rep counting — arm() now lands in .settling, not .repping.
         var controller = SetLifecycleController()
         controller.arm()
-        XCTAssertEqual(controller.state, .armed)
+        XCTAssertEqual(controller.state, .settling)
     }
 
-    func test_repCompletedWhileArmedTransitionsToRepping_andIncrementsCount() {
+    func test_settlingWithNoRepStaysSettlingWithZeroReps() {
+        // A stray motion sample or two during unrack/walkout must not
+        // advance repCount or leave .settling on its own — only a genuine
+        // (segmenter-gated) repCompleted() call does that.
+        var controller = SetLifecycleController()
+        controller.arm()
+        XCTAssertEqual(controller.state, .settling)
+        XCTAssertEqual(controller.repCount, 0)
+    }
+
+    func test_repCompletedWhileSettlingTransitionsToRepping_andIncrementsCount() {
+        // The segmenter's gated first rep (P15-D2) is what ends .settling —
+        // it counts as rep 1, not a zeroth "warmup" rep.
         var controller = SetLifecycleController()
         controller.arm()
         controller.repCompleted()
@@ -63,7 +77,7 @@ final class SetLifecycleTests: XCTestCase {
         var controller = SetLifecycleController()
         controller.arm()
         controller.autoRack()
-        XCTAssertEqual(controller.state, .armed)
+        XCTAssertEqual(controller.state, .settling)
     }
 
     func test_autoRackWhileReppingClearsAlertStage() {
@@ -139,7 +153,7 @@ final class SetLifecycleTests: XCTestCase {
         XCTAssertEqual(controller.state, .complete)
 
         controller.arm()
-        XCTAssertEqual(controller.state, .armed)
+        XCTAssertEqual(controller.state, .settling)
         XCTAssertEqual(controller.repCount, 0)
     }
 
@@ -243,13 +257,13 @@ final class SetLifecycleTests: XCTestCase {
         XCTAssertEqual(controller.state, .idle)
     }
 
-    func test_restTickWhileIdleOrArmedIsIgnored() {
+    func test_restTickWhileIdleOrSettlingIsIgnored() {
         var controller = SetLifecycleController()
         controller.restTick(elapsed: 5)
         XCTAssertEqual(controller.state, .idle)
 
         controller.arm()
         controller.restTick(elapsed: 5)
-        XCTAssertEqual(controller.state, .armed)
+        XCTAssertEqual(controller.state, .settling)
     }
 }
