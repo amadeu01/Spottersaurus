@@ -69,10 +69,14 @@ public struct SetLifecycleController: Sendable, Equatable {
 
     /// The bar-motion-settle signal (computed upstream, not here): the bar has
     /// come to rest after the working set's last rep. Valid only from
-    /// `.repping`; ignored otherwise.
+    /// `.repping`; ignored otherwise. Belt-and-suspenders: once the bar is
+    /// racked the danger is over, so any lingering alert clears automatically
+    /// here too, rather than depending on the lifter tapping Resolved (see
+    /// docs/backlog.md P1-1b).
     public mutating func autoRack() {
         guard state == .repping else { return }
         state = .racked
+        alertStage = .none
     }
 
     /// A rest-timer tick / elapsed reading, injected by the caller (never a

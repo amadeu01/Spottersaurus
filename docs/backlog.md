@@ -27,7 +27,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (add date).
 
 ### P1-1 — Fix stuck `RACK IT` — **L** → split
 
-- [ ] **P1-1a** `S` · Kit · **SetLifecycleController: resolve from any state.**
+- [x] **P1-1a** `S` · Kit · **SetLifecycleController: resolve from any state.** (2026-07-10)
   Goal: `.resolved` clears `alertStage` regardless of `state` (currently guarded
   to `.repping`). Done-when: unit tests prove resolve clears from `.racked`,
   `.resting`, `.complete`; existing tests green.

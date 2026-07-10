@@ -66,6 +66,38 @@ final class SetLifecycleTests: XCTestCase {
         XCTAssertEqual(controller.state, .armed)
     }
 
+    func test_autoRackWhileReppingClearsAlertStage() {
+        var controller = SetLifecycleController()
+        controller.arm()
+        controller.repCompleted()
+        controller.handle(spotEvent: SpotEvent(kind: .rackIt, timestamp: 1.0, repIndex: 0, confidence: 0.95, reason: .sustainedPin))
+        XCTAssertEqual(controller.alertStage, .rackIt)
+
+        controller.autoRack()
+        XCTAssertEqual(controller.state, .racked)
+        XCTAssertEqual(controller.alertStage, .none)
+    }
+
+    func test_autoRackWhileNotReppingDoesNotClearAlertStage() {
+        var controller = SetLifecycleController()
+        controller.arm()
+        controller.repCompleted()
+        controller.handle(spotEvent: SpotEvent(kind: .rackIt, timestamp: 1.0, repIndex: 0, confidence: 0.95, reason: .sustainedPin))
+        controller.autoRack()
+        XCTAssertEqual(controller.state, .racked)
+        // The first autoRack() call above did the (state == .repping)-gated
+        // transition + clear. From here on we're already .racked with
+        // alertStage already .none.
+        XCTAssertEqual(controller.alertStage, .none)
+
+        // Calling autoRack() again from .racked (not .repping) must be a
+        // genuine no-op: the guard blocks it before either the state
+        // transition or the alertStage reset run, so nothing changes.
+        controller.autoRack()
+        XCTAssertEqual(controller.state, .racked)
+        XCTAssertEqual(controller.alertStage, .none)
+    }
+
     func test_restTickWhileRackedTransitionsToResting() {
         var controller = SetLifecycleController()
         controller.arm()
@@ -148,7 +180,9 @@ final class SetLifecycleTests: XCTestCase {
         controller.handle(spotEvent: SpotEvent(kind: .rackIt, timestamp: 1.0, repIndex: 0, confidence: 0.95, reason: .sustainedPin))
         controller.autoRack()
         XCTAssertEqual(controller.state, .racked)
-        XCTAssertEqual(controller.alertStage, .rackIt)
+        // autoRack() itself already clears alertStage (P1-1b belt-and-suspenders);
+        // .resolved arriving afterwards must still be a harmless no-op.
+        XCTAssertEqual(controller.alertStage, .none)
 
         controller.handle(spotEvent: SpotEvent(kind: .resolved, timestamp: 2.0, repIndex: 0, confidence: 0.5, reason: .lockout))
         XCTAssertEqual(controller.alertStage, .none)
@@ -163,7 +197,8 @@ final class SetLifecycleTests: XCTestCase {
         controller.autoRack()
         controller.restTick(elapsed: 0)
         XCTAssertEqual(controller.state, .resting)
-        XCTAssertEqual(controller.alertStage, .rackIt)
+        // autoRack() already cleared alertStage on the way here (P1-1b).
+        XCTAssertEqual(controller.alertStage, .none)
 
         controller.handle(spotEvent: SpotEvent(kind: .resolved, timestamp: 2.0, repIndex: 0, confidence: 0.5, reason: .lockout))
         XCTAssertEqual(controller.alertStage, .none)
@@ -179,7 +214,8 @@ final class SetLifecycleTests: XCTestCase {
         controller.restTick(elapsed: 0)
         controller.restTick(elapsed: 90)
         XCTAssertEqual(controller.state, .complete)
-        XCTAssertEqual(controller.alertStage, .rackIt)
+        // autoRack() already cleared alertStage on the way here (P1-1b).
+        XCTAssertEqual(controller.alertStage, .none)
 
         controller.handle(spotEvent: SpotEvent(kind: .resolved, timestamp: 91.0, repIndex: 0, confidence: 0.5, reason: .lockout))
         XCTAssertEqual(controller.alertStage, .none)
