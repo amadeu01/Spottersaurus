@@ -22,6 +22,21 @@ public enum BarTracking: String, Codable, Sendable, CaseIterable {
     case backLoaded
 }
 
+/// The shape rep 1 of a set must show, keyed by where the bar starts at
+/// arm (ADR 0006). Distinct from `BarTracking`: bench is wrist-tracked but
+/// starts at the top like squat, while deadlift is wrist-tracked but starts
+/// on the floor — so this needs the lift itself, not just the tracking mode.
+public enum RepGateMode: String, Codable, Sendable, CaseIterable {
+    /// Bar starts racked / held at the top (squat, bench): rep 1 must show
+    /// an eccentric (down) immediately before its concentric (up). A lone
+    /// upward excursion with no preceding descent — a walkout step, a
+    /// re-rack adjustment — is not rep 1.
+    case eccentricFirst
+    /// Bar starts on the floor (deadlift): rep 1 is a concentric-from-rest,
+    /// with no preceding eccentric.
+    case concentricFirst
+}
+
 /// The set of lifts Spottersaurus understands. The three competition lifts
 /// plus a catch-all for assistance work.
 public enum LiftKind: String, Codable, Sendable, CaseIterable, Identifiable {
@@ -56,5 +71,17 @@ public enum LiftKind: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Whether the wrist-velocity (VBT) path is available for this lift.
     public var usesVelocityPath: Bool {
         barTracking == .wristTracked
+    }
+
+    /// The rep-1 gate `RepSegmenter` applies after the post-arm settle
+    /// (ADR 0006). Squat and bench start with the bar racked/held at the
+    /// top; deadlift starts with the bar on the floor. Accessory work
+    /// defaults to `.eccentricFirst` (most assistance lifts — presses,
+    /// curls, rows off a rack — start from a held top position too).
+    public var repGateMode: RepGateMode {
+        switch self {
+        case .deadlift: .concentricFirst
+        case .squat, .bench, .accessory: .eccentricFirst
+        }
     }
 }

@@ -108,6 +108,81 @@ final class DetectionTests: XCTestCase {
         }
     }
 
+    // MARK: - Segmenter: setup phase (ADR 0006)
+
+    /// Squat/bench: a walkout wiggle before the lifter ever settles (a lone
+    /// upward excursion, no preceding descent) must be discarded outright —
+    /// not read as a bout at all — leaving exactly the real reps.
+    func testSegmenterDiscardsPreSettleWalkoutForSquatBench() {
+        var b = MotionBuilder()
+        b.bump(amplitude: 0.35, duration: 0.5)   // walkout: bar jostled out of the rack
+        b.still(0.4)                              // settle: braced, ready to lift
+        for _ in 0..<4 {
+            b.bump(amplitude: -0.5, duration: 0.8)   // eccentric
+            b.bump(amplitude: 0.5, duration: 0.8)    // concentric
+            b.still(0.4)
+        }
+
+        let phases = RepSegmenter().segment(motion: b.samples, lift: .bench)
+        XCTAssertEqual(phases.count, 4, "the pre-settle walkout wiggle must not be counted as a rep; got \(phases.count)")
+        XCTAssertNotNil(phases.first?.eccentricStart, "rep 1 must be the real eccentric→concentric rep, not the walkout")
+    }
+
+    /// A lone upward excursion that slips past the settle heuristic (e.g. a
+    /// re-rack adjustment right after an early pause) is still not rep 1: the
+    /// rep-1 gate drops it because it has no preceding eccentric.
+    func testSegmenterRepOneGateRejectsPostSettleReRackAdjustment() {
+        var b = MotionBuilder()
+        b.still(0.4)                               // settle achieved immediately
+        b.bump(amplitude: 0.35, duration: 0.5)      // re-rack adjustment: lone upward bump
+        b.still(0.4)                                // brief pause
+        for _ in 0..<3 {
+            b.bump(amplitude: -0.5, duration: 0.8)
+            b.bump(amplitude: 0.5, duration: 0.8)
+            b.still(0.4)
+        }
+
+        let phases = RepSegmenter().segment(motion: b.samples, lift: .bench)
+        XCTAssertEqual(phases.count, 3, "a lone upward excursion with no preceding descent must not count as rep 1; got \(phases.count)")
+        XCTAssertNotNil(phases.first?.eccentricStart)
+    }
+
+    /// Deadlift: the bar starts on the floor, so rep 1 is a genuine
+    /// concentric-from-rest with no preceding eccentric — the approach/grip
+    /// wiggle before the settle is discarded exactly as for squat/bench.
+    func testSegmenterCountsDeadliftRepOneWithNoEccentric() {
+        var b = MotionBuilder()
+        b.bump(amplitude: 0.3, duration: 0.4)    // approach: setting grip, not yet settled
+        b.still(0.4)                              // settle: grip set, ready to pull
+        for _ in 0..<4 {
+            b.bump(amplitude: 0.5, duration: 0.8)  // concentric: pull from the floor
+            b.still(0.4)                            // dead-stop pause at the floor
+        }
+
+        let phases = RepSegmenter().segment(motion: b.samples, lift: .deadlift)
+        XCTAssertEqual(phases.count, 4, "approach wiggle must be discarded, all 4 pulls counted; got \(phases.count)")
+        XCTAssertNil(phases.first?.eccentricStart, "deadlift rep 1 is a concentric-from-rest with no preceding eccentric")
+    }
+
+    /// The rep-1 gate is genuinely per-lift: the same buffer (concentric-from-
+    /// rest, then a normal eccentric→concentric rep) is read differently by
+    /// deadlift vs bench.
+    func testSegmenterRepOneGateDiffersByLift() {
+        var b = MotionBuilder()
+        b.still(0.4)
+        b.bump(amplitude: 0.5, duration: 0.8)     // concentric-from-rest, no preceding eccentric
+        b.still(0.4)
+        b.bump(amplitude: -0.5, duration: 0.8)    // eccentric
+        b.bump(amplitude: 0.5, duration: 0.8)     // concentric
+        b.still(0.4)
+
+        let deadliftPhases = RepSegmenter().segment(motion: b.samples, lift: .deadlift)
+        XCTAssertEqual(deadliftPhases.count, 2, "deadlift accepts the concentric-from-rest excursion as rep 1")
+
+        let benchPhases = RepSegmenter().segment(motion: b.samples, lift: .bench)
+        XCTAssertEqual(benchPhases.count, 1, "bench must reject the lone upward excursion as rep 1, keeping only the real eccentric→concentric rep")
+    }
+
     // MARK: - Velocity integrator
 
     func testVelocityIntegratorRecoversKnownProfile() {

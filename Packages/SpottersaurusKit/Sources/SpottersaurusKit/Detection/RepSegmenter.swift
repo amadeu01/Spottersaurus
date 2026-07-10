@@ -9,6 +9,12 @@
 //  upward (positive-velocity) excursion, an eccentric a downward one. Pure math,
 //  no hardware, driven entirely off sample timestamps.
 //
+//  ADR 0006: motion before the first settle (the unrack / walkout / lift-off)
+//  is discarded before bout-walking even starts, and the first surviving phase
+//  must match the lift's rep-1 pattern (`LiftKind.repGateMode`) — squat/bench
+//  start at the top (eccentric before concentric), deadlift starts on the
+//  floor (concentric-from-rest, no preceding eccentric).
+//
 
 import Foundation
 
@@ -54,19 +60,30 @@ public struct RepSegmenter: Sendable {
     }
 
     /// Convenience: gravity-remove a raw accelerometer stream, then segment.
-    public func segment(motion: [MotionSample]) -> [RepPhase] {
-        segment(GravityRemover.axialAcceleration(motion, timeConstant: config.gravityTimeConstant))
+    /// - Parameter lift: picks the rep-1 gate (ADR 0006). Defaults to the
+    ///   `.eccentricFirst` gate (bench/squat's bar-starts-at-top pattern),
+    ///   which matches a lone-upward-excursion check most callers want.
+    public func segment(motion: [MotionSample], lift: LiftKind = .bench) -> [RepPhase] {
+        segment(GravityRemover.axialAcceleration(motion, timeConstant: config.gravityTimeConstant), lift: lift)
     }
 
     /// Segments a bar-axis linear-acceleration stream into reps.
-    public func segment(_ linear: [LinearSample]) -> [RepPhase] {
+    ///
+    /// Two setup-phase safeguards run before ordinary rep counting (ADR
+    /// 0006): (1) any motion before the first qualifying still/braced run —
+    /// the unrack / walkout / lift-off — is discarded outright rather than
+    /// folded into the first bout; (2) once real bouts begin, any leading
+    /// phase(s) that don't match `lift`'s rep-1 start pattern (a walkout
+    /// step or re-rack adjustment slipping past the settle heuristic) are
+    /// dropped until one does. Reps 2..n are never re-checked.
+    public func segment(_ linear: [LinearSample], lift: LiftKind = .bench) -> [RepPhase] {
         guard linear.count >= 2 else { return [] }
 
         let still = stillMask(linear)
         let v = integratedVelocity(linear, still: still)
 
         var phases: [RepPhase] = []
-        var i = 0
+        var i = setupEndIndex(still)
         let n = linear.count
 
         // Walk motion bouts (contiguous non-still regions); within each, read
@@ -78,6 +95,8 @@ public struct RepSegmenter: Sendable {
             phases.append(contentsOf: concentrics(in: linear, velocity: v, lo: i, hi: j))
             i = j
         }
+
+        phases = applyingRepOneGate(phases, mode: lift.repGateMode)
 
         // Assign global rep order.
         for k in phases.indices { phases[k].index = k }
@@ -126,6 +145,39 @@ public struct RepSegmenter: Sendable {
             i = j
         }
         return mask
+    }
+
+    // MARK: - Setup phase (ADR 0006)
+
+    /// The index at which rep detection should begin: the end of the first
+    /// qualifying still/braced run in the buffer. Everything before it — the
+    /// unrack / walkout / lift-off — is setup motion, not a bout; skipping
+    /// straight to this index (rather than starting the bout walk at 0)
+    /// keeps it from ever being read as a rep. A buffer that never settles
+    /// yields `linear.count`: nothing after it to detect.
+    func setupEndIndex(_ still: [Bool]) -> Int {
+        let n = still.count
+        var i = 0
+        while i < n && !still[i] { i += 1 }   // skip walkout/lift-off motion
+        guard i < n else { return n }          // never settles: no reps
+        while i < n && still[i] { i += 1 }     // walk to the end of the settle
+        return i
+    }
+
+    /// Drops any leading phases that don't match `mode`'s rep-1 start
+    /// pattern — a walkout step or re-rack adjustment that produced its own
+    /// bout despite `setupEndIndex`, most often because the lifter paused
+    /// mid-setup long enough to look like a settle. Once a phase matches,
+    /// it and everything after it (reps 2..n, never re-checked) are kept.
+    func applyingRepOneGate(_ phases: [RepPhase], mode: RepGateMode) -> [RepPhase] {
+        var start = 0
+        while start < phases.count {
+            let hasEccentric = phases[start].eccentricStart != nil
+            let isRepOneShape = (mode == .eccentricFirst) ? hasEccentric : !hasEccentric
+            if isRepOneShape { break }
+            start += 1
+        }
+        return Array(phases[start...])
     }
 
     // MARK: - Phase extraction within a bout

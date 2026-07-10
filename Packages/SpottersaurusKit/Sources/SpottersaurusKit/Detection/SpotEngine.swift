@@ -198,7 +198,7 @@ public struct SpotEngine: Sendable {
         hr: [HRSample] = []
     ) -> SpotAnalysis {
         let linear = GravityRemover.axialAcceleration(motion, timeConstant: config.gravityTimeConstant)
-        let phases = RepSegmenter(config: config).segment(linear)
+        let phases = RepSegmenter(config: config).segment(linear, lift: lift)
         let usesVelocity = lift.usesVelocityPath
 
         var events: [SpotEvent] = []

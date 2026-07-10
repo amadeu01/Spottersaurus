@@ -51,7 +51,7 @@ public struct Calibration: Sendable {
     /// Calibrates a lift from a buffer of clean warmup reps.
     public func calibrate(lift: LiftKind, warmupMotion: [MotionSample]) -> CalibrationValues {
         let linear = GravityRemover.axialAcceleration(warmupMotion, timeConstant: config.gravityTimeConstant)
-        let phases = RepSegmenter(config: config).segment(linear)
+        let phases = RepSegmenter(config: config).segment(linear, lift: lift)
         return calibrate(lift: lift, linear: linear, phases: phases)
     }
 
