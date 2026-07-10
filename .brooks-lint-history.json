@@ -1,0 +1,13 @@
+[
+  {
+    "date": "2026-07-10",
+    "mode": "Architecture Audit",
+    "score": 89,
+    "findings": {
+      "critical": 0,
+      "warning": 2,
+      "suggestion": 1
+    },
+    "scope": "entire project (~120 swift files)"
+  }
+]

@@ -15,10 +15,12 @@ The iPhone plans programs and reviews history; the Watch is the in-gym executor.
 
 - 🦖 **Auto-spotter** — conservative, two-stage stall detection (grind → RACK IT)
 - 🏋️ **All three SBD** — bench/deadlift via wrist velocity; squat via tempo + HR + manual grind tap
-- ⌚ **Watch-first** — runs a standalone `HKWorkoutSession` with high-rate CoreMotion + HR
+- ⌚ **Watch-first** — standalone `HKWorkoutSession` with high-rate CoreMotion + HR; **the Watch owns the live session**
 - 📊 **Bar-speed (VBT)** — concentric velocity readouts and velocity-at-load charts
 - 📱 **iPhone planner** — custom program builder + 5/3/1 and linear-progression presets
 - ☁️ **Synced** — SwiftData + CloudKit private mirror; writes finished workouts to Apple Health
+
+Full feature map → [`docs/features.md`](docs/features.md).
 
 ## Platforms
 
@@ -29,20 +31,36 @@ WatchConnectivity · Swift Charts.
 
 | Target | Role |
 |---|---|
-| `Spottersaurus` | iOS app — planner / reviewer |
-| `Spottersaurus Watch App` | watchOS app — live executor + auto-spotter |
-| `SpottersaurusKit` | shared package — Model · Detection · Sync · Design |
+| `Spottersaurus` | iOS app — planner / reviewer + live Mirror |
+| `Spottersaurus Watch App` | watchOS app — authoritative live executor + auto-spotter |
+| `SpottersaurusKit` | shared package — Model · Detection · Session · Sync · Analytics · Design |
+
+The shared package holds everything written once (schema, detection math, session
+logic, transport domain, design tokens) and unit-tests on macOS. Architecture,
+module graph, and data-flow diagrams → [`docs/architecture.md`](docs/architecture.md).
+
+## Documentation
+
+| Doc | What |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | System, module graph, hexagonal transport, live-session data flow (mermaid). |
+| [`docs/features.md`](docs/features.md) | Feature map + the auto-spotter detection pipeline. |
+| [`docs/PLAN.md`](docs/PLAN.md) | Roadmap: locked decisions, current state, phased plan. |
+| [`docs/adr/`](docs/adr/) | Architectural Decision Records. |
+| [`CONTEXT.md`](CONTEXT.md) | Ubiquitous-language glossary. |
+| [`docs/TASKS.md`](docs/TASKS.md) | Execution checklist for the plan. |
 
 ## Status
 
-🚧 Early development. Project setup, shared model/detection/progression/analytics
-logic, and the first Watch live-set UI slice are in. See the full spec in
-[`docs/PLAN.md`](docs/PLAN.md) and the build checklist in [`docs/TASKS.md`](docs/TASKS.md).
+🚧 Active development. Solo auto-spotter core, shared model/detection/analytics,
+Watch live-set UI, and iPhone planner/history/charts are in. Current focus:
+stabilize the alert path, then restructure the Watch↔iPhone transport into a
+shared, testable Kit service. See [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Build
 
 ```bash
-# shared package
+# shared package — the reliable test gate (runs on macOS)
 cd Packages/SpottersaurusKit && swift test
 
 # iOS app
