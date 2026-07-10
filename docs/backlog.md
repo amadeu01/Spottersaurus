@@ -123,6 +123,50 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ---
 
+## Phase 1.6 — Raw sensor capture & replay (ADR 0008)
+
+Keep every raw sample per set, transfer durably to the iPhone, reprocess offline.
+Debug/tuning asset — local files, not CloudKit.
+
+### PRC-1 — Capture format + exporter — **M**
+
+- [ ] **PRC-1** `M` · Kit · **Versioned capture container + NDJSON/CSV export.**
+  Goal: a `Codable` `RawSetCapture` (schema version, session id, set id, lift,
+  arm date, `[DeviceMotionSample]`, `[HRSample]`, lifecycle markers) with compact
+  binary encode/decode and an NDJSON/CSV exporter. Done-when: round-trip +
+  old-version-decodes tests; export test; `swift test` green.
+
+### PRC-2 — Watch capture recorder — **M**
+
+- [ ] **PRC-2** `M` · Watch · **Buffer arm→end per set; `transferFile` on end.**
+  Goal: record all device-motion + HR samples for the set (incl. setup), write a
+  `RawSetCapture` file, `WCSession.transferFile` it when the set ends. Bounded
+  memory / streamed to disk. Done-when: on-device a completed set produces a file
+  that arrives on the phone. (Device-side; Kit format carries the tests.)
+
+### PRC-3 — iPhone receive + store + retention — **M**
+
+- [ ] **PRC-3** `M` · iPhone · **Receive, group workout→exercise→set, prune.**
+  Goal: accept the transferred file, store locally referenced by set id from
+  `WorkoutSession`/`CompletedSet`, grouped by workout/exercise/set; keep-last-N
+  retention + manual delete. Done-when: files land, are listable per set, prune
+  works.
+
+### PRC-4 — Offline replay through the engine — **S**
+
+- [ ] **PRC-4** `S` · Kit · **Replay a capture through `SpotEngine`.**
+  Goal: a pure function that feeds a `RawSetCapture` back through the pipeline to
+  reproduce events/metrics deterministically. Done-when: replaying a recorded
+  buffer yields the same `SpotAnalysis`; `swift test` green.
+
+### PRC-5 — Debug surface: list / export / replay — **S**
+
+- [ ] **PRC-5** `S` · iPhone · **Captures in the Debug tab.** Goal: list captures
+  per set, export NDJSON/CSV, re-run the engine and show results — extends
+  `Features/Debug`. Done-when: renders; export + replay invoke PRC-1/PRC-4.
+
+---
+
 ## Phase 2 — Restructure transport & sync
 
 ### P2-3 — Shared `WireKeys` — **S**

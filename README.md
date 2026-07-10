@@ -45,6 +45,7 @@ module graph, and data-flow diagrams → [`docs/architecture.md`](docs/architect
 |---|---|
 | [`docs/architecture.md`](docs/architecture.md) | System, module graph, hexagonal transport, live-session data flow (mermaid). |
 | [`docs/features.md`](docs/features.md) | Feature map + the auto-spotter detection pipeline. |
+| [`docs/vbt.md`](docs/vbt.md) | How bar velocity (VBT) is computed from the sensors, worked example. |
 | [`docs/PLAN.md`](docs/PLAN.md) | Roadmap: locked decisions, current state, phased plan. |
 | [`docs/backlog.md`](docs/backlog.md) | Sized (S/M/L/XL), agent-deliverable task breakdown. |
 | [`docs/adr/`](docs/adr/) | Architectural Decision Records. |
