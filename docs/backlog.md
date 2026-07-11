@@ -83,7 +83,7 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ### P15-S2 — Watch feed uses `deviceMotionUpdates` — **M** (ADR 0007)
 
-- [ ] **P15-S2** `M` · Watch · **Stream fused device motion (200 Hz).**
+- [x] **P15-S2** `M` · Watch · **Stream fused device motion (200 Hz).** (2026-07-11)
   Goal: `WatchMotionStreamAdapter` uses `CMBatchedSensorManager.deviceMotionUpdates()`
   producing `DeviceMotionSample`; keep accelerometer + `CMMotionManager` fallbacks.
   Done-when: builds; on-device the pipeline runs off fused motion. (Device-side —
