@@ -176,7 +176,7 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### PRC-4 — Offline replay through the engine — **S**
 
-- [ ] **PRC-4** `S` · Kit · **Replay a capture through `SpotEngine`.**
+- [x] **PRC-4** `S` · Kit · **Replay a capture through `SpotEngine`.** (2026-07-10)
   Goal: a pure function that feeds a `RawSetCapture` back through the pipeline to
   reproduce events/metrics deterministically. Done-when: replaying a recorded
   buffer yields the same `SpotAnalysis`; `swift test` green.
@@ -236,7 +236,7 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### P2-7 — Sequence numbers + Session Snapshot — **L** → split
 
-- [ ] **P2-7a** `S` · Kit · **Sequence number + idempotent fold.**
+- [x] **P2-7a** `S` · Kit · **Sequence number + idempotent fold.** (2026-07-10)
   Goal: add a monotonic seq to tick/lifecycle envelopes; reducer folds
   idempotently and ignores stale seq. Done-when: out-of-order/duplicate fold
   tests pass.
@@ -249,7 +249,7 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### P2-8 — Keepalive & liveness — **L** → split
 
-- [ ] **P2-8a** `M` · Kit · **Heartbeat-recency liveness.**
+- [x] **P2-8a** `M` · Kit · **Heartbeat-recency liveness.** (2026-07-10)
   Goal: derive "live" from heartbeat recency, not raw `isReachable`; feed
   `ConnectionStatus`. Done-when: reducer tests for blip-tolerance + stale window.
 - [ ] **P2-8b** `M` · Watch + iPhone · **`HKWorkoutSession` keepalive + reactivation.**
