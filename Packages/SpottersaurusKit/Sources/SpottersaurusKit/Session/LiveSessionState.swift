@@ -112,6 +112,54 @@ public struct LiveSessionState: Sendable, Equatable {
     /// timeout (ADR 0001 / CONTEXT.md "Live Session").
     public static let staleTimeout: TimeInterval = 5 * 60
 
+    /// The short window within which a sequenced tick/heartbeat (ADR 0001's
+    /// ~2 s heartbeat) must have arrived for the link to read as `.live`
+    /// (ADR 0003, "Liveness = heartbeat, not raw reachability"). Set to 3x
+    /// the heartbeat cadence so a single missed beat can't flip the status —
+    /// only a sustained gap does. This is a *different, much shorter* axis
+    /// than `staleTimeout`: `staleTimeout` decides whether the whole Live
+    /// Session should be torn down; `heartbeatWindow` decides whether the
+    /// *link* momentarily looks quiet while the session obviously continues.
+    public static let heartbeatWindow: TimeInterval = 6
+
+    /// Heartbeat-recency liveness of the Watch↔iPhone link (ADR 0003),
+    /// distinct from `ConnectionStatus` (pairing/reachability — "can we
+    /// reach the Watch at all") and from `isStale`/`phase` (session
+    /// lifecycle — "has this session ended"). This axis answers a narrower
+    /// question: "is data actually flowing right now". A brief reachability
+    /// blip reads as `.reconnecting`, not a drop, and self-heals back to
+    /// `.live` the moment a fresh tick/heartbeat arrives — it never latches.
+    public enum LiveLinkStatus: Sendable, Equatable, CaseIterable {
+        /// A tick/heartbeat/lifecycle event arrived within `heartbeatWindow`
+        /// of `now` — the link looks healthy.
+        case live
+        /// Quiet longer than `heartbeatWindow` but still under `staleTimeout`
+        /// — probably a brief foreground/background or radio blip; the
+        /// session is still considered active, but the UI should show
+        /// "reconnecting" rather than the last-known metrics as gospel.
+        case reconnecting
+        /// Quiet at or beyond `staleTimeout` — same threshold `isStale` uses;
+        /// the session is effectively dead.
+        case stale
+    }
+
+    /// Pure derivation of `LiveLinkStatus` from the timestamp of the most
+    /// recently folded tick/lifecycle event (`lastEventAt`) and an injected
+    /// `now` — no timers, no wall-clock reads. A session that has never
+    /// folded any event (`lastEventAt == nil`) has nothing to call "live",
+    /// so it reads as `.stale`.
+    public func linkStatus(
+        at now: Date,
+        heartbeatWindow: TimeInterval = LiveSessionState.heartbeatWindow,
+        staleTimeout: TimeInterval = LiveSessionState.staleTimeout
+    ) -> LiveLinkStatus {
+        guard let lastEventAt else { return .stale }
+        let age = now.timeIntervalSince(lastEventAt)
+        if age < heartbeatWindow { return .live }
+        if age < staleTimeout { return .reconnecting }
+        return .stale
+    }
+
     public private(set) var phase: Phase = .idle
     public private(set) var identity: Identity?
     public private(set) var metrics: Metrics?

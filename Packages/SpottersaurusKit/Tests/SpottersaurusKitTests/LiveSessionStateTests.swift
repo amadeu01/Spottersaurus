@@ -205,6 +205,97 @@ final class LiveSessionStateTests: XCTestCase {
         XCTAssertEqual(state.phase, .ended)
     }
 
+    // MARK: - heartbeat liveness (ADR 0003: reconnecting band, distinct from staleTimeout)
+
+    func test_linkStatus_noEventEverFolded_isStale() {
+        let state = LiveSessionState()
+        XCTAssertEqual(state.linkStatus(at: t0), .stale)
+    }
+
+    func test_linkStatus_freshHeartbeat_withinWindow_isLive() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(), now: t0)
+        state.reduce(tick: tick(), now: t0.addingTimeInterval(2))
+
+        let now = t0.addingTimeInterval(2 + LiveSessionState.heartbeatWindow - 0.01)
+        XCTAssertEqual(state.linkStatus(at: now), .live)
+    }
+
+    func test_linkStatus_quietPastHeartbeatWindow_butUnderStaleTimeout_isReconnecting() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(), now: t0)
+        state.reduce(tick: tick(), now: t0.addingTimeInterval(2))
+
+        let now = t0.addingTimeInterval(2 + LiveSessionState.heartbeatWindow + 1)
+        XCTAssertEqual(state.linkStatus(at: now), .reconnecting)
+    }
+
+    func test_linkStatus_quietAtHeartbeatWindowBoundary_isReconnecting() {
+        var state = LiveSessionState()
+        state.reduce(tick: tick(), now: t0)
+
+        // Exactly at the window edge, not strictly under it — a single
+        // missed beat tips into "reconnecting", not still "live".
+        let now = t0.addingTimeInterval(LiveSessionState.heartbeatWindow)
+        XCTAssertEqual(state.linkStatus(at: now), .reconnecting)
+    }
+
+    func test_linkStatus_quietBeyondStaleTimeout_isStale() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(), now: t0)
+        state.reduce(tick: tick(), now: t0.addingTimeInterval(2))
+
+        let now = t0.addingTimeInterval(2 + LiveSessionState.staleTimeout)
+        XCTAssertEqual(state.linkStatus(at: now), .stale)
+    }
+
+    func test_linkStatus_quietAtStaleTimeoutBoundary_isStale() {
+        var state = LiveSessionState()
+        state.reduce(tick: tick(), now: t0)
+
+        let now = t0.addingTimeInterval(LiveSessionState.staleTimeout)
+        XCTAssertEqual(state.linkStatus(at: now), .stale)
+    }
+
+    func test_linkStatus_briefBlipThenFreshHeartbeat_returnsToLive() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(), now: t0)
+        state.reduce(tick: tick(), now: t0.addingTimeInterval(2))
+
+        // Quiet gap tips into "reconnecting"...
+        let quiet = t0.addingTimeInterval(2 + LiveSessionState.heartbeatWindow + 1)
+        XCTAssertEqual(state.linkStatus(at: quiet), .reconnecting)
+
+        // ...but a fresh heartbeat arriving right after self-heals the link
+        // back to `.live` without ever tearing the session down — a blip,
+        // not a drop.
+        state.reduce(tick: tick(repCount: 2), now: quiet)
+        let rightAfter = quiet.addingTimeInterval(1)
+        XCTAssertEqual(state.linkStatus(at: rightAfter), .live)
+    }
+
+    func test_linkStatus_lifecycleEventAlsoCountsAsHeartbeat() {
+        // `armed`/`ended` fold `lastEventAt` too, not just ticks — a fresh
+        // lifecycle event is just as much a sign of a live link as a tick.
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(), now: t0)
+
+        let now = t0.addingTimeInterval(LiveSessionState.heartbeatWindow - 1)
+        XCTAssertEqual(state.linkStatus(at: now), .live)
+    }
+
+    func test_linkStatus_respectsInjectedThresholds_notJustDefaults() {
+        var state = LiveSessionState()
+        state.reduce(tick: tick(), now: t0)
+
+        let now = t0.addingTimeInterval(3)
+        // With a custom, tighter window (2s), 3s of quiet is already
+        // reconnecting even though it's under the *default* 6s window.
+        XCTAssertEqual(state.linkStatus(at: now, heartbeatWindow: 2, staleTimeout: 10), .reconnecting)
+        // With a custom, looser window (10s), the same 3s gap is still live.
+        XCTAssertEqual(state.linkStatus(at: now, heartbeatWindow: 10, staleTimeout: 20), .live)
+    }
+
     // MARK: - idempotent fold (ADR 0004: sequence-gated dedupe)
 
     func test_initialState_lastSequenceIsZero() {
