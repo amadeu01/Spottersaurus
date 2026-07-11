@@ -197,7 +197,7 @@ final class LiveSetViewModel {
         case .none:
             switch lifecycle.state {
             case .idle: "READY"
-            case .armed: "ARMED"
+            case .settling: "SET UP"
             case .repping: "LIVE"
             case .racked, .resting: "REST"
             case .complete: "SET COMPLETE"
@@ -261,17 +261,9 @@ final class LiveSetViewModel {
         heartRate += 3
     }
 
-    func flagGrinding() {
-        lifecycle.handle(spotEvent: spotEvent(kind: .grinding, confidence: 0.72, reason: .concentricTempo))
-    }
-
-    func rackIt() {
-        lifecycle.handle(spotEvent: spotEvent(kind: .rackIt, confidence: 0.94, reason: .sustainedPin))
-    }
-
     func rack(logger: any AppLogger = LoggerGroup.watch) {
         logger.notice(.liveSet, "racking set reps=\(repCount)")
-        if lifecycle.state == .armed {
+        if lifecycle.state == .settling {
             lifecycle.repCompleted()
         }
         lifecycle.autoRack()
@@ -338,7 +330,7 @@ final class LiveSetViewModel {
             return
         }
 
-        guard lifecycle.state == .armed || lifecycle.state == .repping else { return }
+        guard lifecycle.state == .settling || lifecycle.state == .repping else { return }
         motionSamples.append(contentsOf: samples)
         trimSamples()
 
@@ -396,6 +388,23 @@ final class LiveSetViewModel {
         restElapsed = 0
         lifecycle.restTick(elapsed: restElapsed)
     }
+
+#if DEBUG
+    /// Preview/test-only: simulates the auto-spotter raising a Stage 1
+    /// ("grinding") or Stage 2 ("RACK IT") escalation so `#Preview`s can show
+    /// those states without live motion/HR input. Never wired to any
+    /// production control — per ADR 0005 ("No mid-rep manual input"), a real
+    /// lifter has no hands-free way to report a grind/pin mid-rep, so
+    /// `SpotEngine`/`RepSegmenter` are the only real source of these events.
+    func debugSimulateGrinding() {
+        lifecycle.handle(spotEvent: spotEvent(kind: .grinding, confidence: 0.72, reason: .concentricTempo))
+    }
+
+    /// See `debugSimulateGrinding()` — same preview/test-only caveat.
+    func debugSimulateRackIt() {
+        lifecycle.handle(spotEvent: spotEvent(kind: .rackIt, confidence: 0.94, reason: .sustainedPin))
+    }
+#endif
 
     private func spotEvent(kind: SpotEventKind, confidence: Double, reason: SpotReason) -> SpotEvent {
         SpotEvent(

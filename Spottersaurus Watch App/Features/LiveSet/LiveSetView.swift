@@ -87,7 +87,7 @@ struct LiveSetView: View {
                             alertStage: viewModel.alertStage
                         )
                         HRAuthIndicatorView(status: viewModel.hrAuthStatus)
-                        if !isLuminanceReduced, viewModel.state == .armed || viewModel.state == .repping {
+                        if !isLuminanceReduced, viewModel.state == .settling || viewModel.state == .repping {
                             // Hidden entirely on the Always-On Display: it's a
                             // dev/liveness micro-readout (sample rate + sample
                             // age) that would otherwise churn every second.
@@ -146,8 +146,6 @@ struct LiveSetView: View {
                                 startWorkout()
                             },
                             completeRep: viewModel.completeRep,
-                            flagGrinding: viewModel.flagGrinding,
-                            rackIt: viewModel.rackIt,
                             rack: {
                                 viewModel.rack(logger: dependencies.logger)
                                 restStartedAt = Date()
@@ -284,11 +282,13 @@ struct LiveSetView: View {
 
 #if DEBUG
 /// Preview-only progression states so `#Preview`s can show `LiveSetView`
-/// already mid-set (armed/repping/grinding/RACK IT) without live sensor
+/// already mid-set (settling/repping/grinding/RACK IT) without live sensor
 /// input — needed to demonstrate the AOD calm variant (Phase 0.2 V1) beyond
-/// the idle/pre-arm screen.
+/// the idle/pre-arm screen. `.grinding`/`.rackIt` drive the view model's
+/// `debugSimulateGrinding()`/`debugSimulateRackIt()` — DEBUG-only test hooks,
+/// never a live production control (ADR 0005).
 enum PreviewLiveSetState {
-    case armed
+    case settling
     case repping(completedReps: Int)
     case grinding
     case rackIt
@@ -304,16 +304,16 @@ extension LiveSetView {
         let model = LiveSetViewModel(plannedSet: plannedSet, setIndex: setIndex, setCount: setCount)
         model.arm()
         switch previewState {
-        case .armed:
+        case .settling:
             break
         case .repping(let completedReps):
             for _ in 0..<completedReps { model.completeRep() }
         case .grinding:
             model.completeRep()
-            model.flagGrinding()
+            model.debugSimulateGrinding()
         case .rackIt:
             model.completeRep()
-            model.rackIt()
+            model.debugSimulateRackIt()
         }
         _viewModel = State(initialValue: model)
         _crownMode = State(initialValue: .load)

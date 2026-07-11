@@ -1,17 +1,17 @@
 import SwiftUI
 import SpottersaurusKit
 
-/// Live-set controls. In a **release** build the wearer only ever sees
-/// Arm / Rack / Rest Done plus the always-present manual `RACK IT` safety
-/// bail — real reps are driven by `SpotEngine` off live motion/HR, not a
-/// tap. `completeRep`/`flagGrinding` are dev-only conveniences for testing
-/// without hardware and compile out entirely in Release via `#if DEBUG`.
+/// Live-set controls. Per ADR 0005 ("No mid-rep manual input"), the wearer's
+/// hands are locked on the bar for the entire working set, so the only
+/// hands-free live interactions are Start (`arm`) and End (`rack`) — there is
+/// no manual grind/rack-it bail, and no manual rep-count nudge in a release
+/// build. Real reps and escalations are driven entirely by `SpotEngine` off
+/// live motion/HR. `completeRep` is a dev-only convenience for testing
+/// without hardware and compiles out entirely in Release via `#if DEBUG`.
 struct LiveSetControlsView: View {
     var state: SetLifecycleState
     var arm: () -> Void
     var completeRep: () -> Void
-    var flagGrinding: () -> Void
-    var rackIt: () -> Void
     var rack: () -> Void
     var finishRest: () -> Void
 
@@ -30,7 +30,7 @@ struct LiveSetControlsView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.Colors.brandOrange)
 
-            case .armed, .repping:
+            case .settling, .repping:
                 liveButtons
 
             case .racked, .resting:
@@ -45,13 +45,12 @@ struct LiveSetControlsView: View {
         .font(.system(.body, design: .rounded, weight: .bold))
     }
 
-    /// Real controls for `.armed`/`.repping`: reps come from auto-detection.
-    /// The wearer can always end the set (`rack`) or force an immediate
-    /// `RACK IT` alarm as a manual safety bail — never gated by DEBUG.
+    /// Real controls for `.settling`/`.repping`: reps and any grind/RACK IT
+    /// escalation come entirely from auto-detection. The wearer can always
+    /// end the set (`rack`) — that's the ADR 0005 "End" hands-free moment,
+    /// not a mid-rep input.
     private var liveButtons: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            rackItBailButton
-
             Button(action: rack) {
                 Label("Rack", systemImage: "checkmark")
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -64,23 +63,13 @@ struct LiveSetControlsView: View {
         }
     }
 
-    /// Always-visible manual safety bail. Fires the same Stage-2 `RACK IT`
-    /// path the auto-spotter uses, so a lifter can self-trigger it if the
-    /// pipeline misses a hard pin.
-    private var rackItBailButton: some View {
-        Button(action: rackIt) {
-            Label("RACK IT", systemImage: "hand.raised.fill")
-                .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(Theme.Colors.alert)
-    }
-
     #if DEBUG
-    /// Dev-only manual overrides for testing the lifecycle without real
+    /// Dev-only manual override for testing rep counting without real
     /// motion/HR hardware. Hidden by default behind a disclosure toggle so
     /// the live-set screen doesn't look "mocked" during normal use, and
-    /// compiles out completely in Release.
+    /// compiles out completely in Release. Deliberately does NOT expose a
+    /// grind/RACK IT trigger here — those are live spotter escalations, and
+    /// ADR 0005 rules out any mid-rep manual input, dev panel included.
     private var devPanel: some View {
         VStack(spacing: Theme.Spacing.xs) {
             Button {
@@ -102,20 +91,11 @@ struct LiveSetControlsView: View {
                         .font(.system(.caption2, design: .rounded, weight: .bold))
                         .foregroundStyle(.secondary)
 
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Button(action: completeRep) {
-                            Image(systemName: "plus")
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button(action: flagGrinding) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(Theme.Colors.caution)
+                    Button(action: completeRep) {
+                        Image(systemName: "plus")
+                            .frame(minWidth: 44, minHeight: 44)
                     }
+                    .buttonStyle(.bordered)
                 }
                 .padding(Theme.Spacing.xs)
                 .background(
@@ -133,8 +113,6 @@ struct LiveSetControlsView: View {
         state: .idle,
         arm: {},
         completeRep: {},
-        flagGrinding: {},
-        rackIt: {},
         rack: {},
         finishRest: {}
     )
@@ -142,13 +120,11 @@ struct LiveSetControlsView: View {
     .background(Theme.Colors.canvas)
 }
 
-#Preview("Armed") {
+#Preview("Settling") {
     LiveSetControlsView(
-        state: .armed,
+        state: .settling,
         arm: {},
         completeRep: {},
-        flagGrinding: {},
-        rackIt: {},
         rack: {},
         finishRest: {}
     )
@@ -161,8 +137,6 @@ struct LiveSetControlsView: View {
         state: .resting,
         arm: {},
         completeRep: {},
-        flagGrinding: {},
-        rackIt: {},
         rack: {},
         finishRest: {}
     )
