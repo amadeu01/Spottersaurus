@@ -1,7 +1,7 @@
 # No mid-rep manual input; squat detection without a grind tap
 
 Date: 2026-07-10
-Status: Accepted
+Status: Accepted (squat-velocity clause refined by ADR 0009)
 
 ## Context
 

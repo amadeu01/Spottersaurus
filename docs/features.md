@@ -103,7 +103,7 @@ graph TD
 
 ### Detection paths per lift
 
-| Lift | Wrist | Path | Stall signal |
+| Lift | Wrist | Alert trigger | Stall signal |
 |---|---|---|---|
-| Bench, Deadlift | tracks the bar | Velocity (VBT) | Mid-concentric velocity collapses toward ~0 before lockout, or concentric duration exceeds the calibrated band. |
-| Squat | static (back-loaded) | Tempo + HR + manual grind tap | Cadence drift, HR spike, lifter's Crown/tap. Velocity path disabled — conservative. |
+| Bench, Deadlift | tracks the bar (arm extends) | Velocity (VBT) | Mid-concentric velocity collapses toward ~0 before lockout, or concentric duration exceeds the calibrated band. |
+| Squat | rides the bar (hands locked on back) | Tempo + HR *(velocity computed, not yet triggered)* | Concentric tempo blows out past baseline, corroborated by HR. Wrist vertical velocity ≈ bar velocity via fused-gravity projection, so MCV is computed/captured, but the trigger stays tempo/HR until validated — see [ADR 0009](adr/0009-squat-velocity-via-fused-gravity.md). No manual tap (hands locked, [ADR 0005](adr/0005-no-mid-rep-manual-input.md)). |

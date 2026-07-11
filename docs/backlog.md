@@ -97,6 +97,21 @@ the walkout counts as a rep and squat leans on an impossible tap.
   synthetic walkout-with-rotation buffer yields no reps while clean vertical reps
   still segment; `swift test` green. (Layers on P15-D2/D3.)
 
+### P15-SQ1 — Compute squat velocity (don't trigger on it yet) — **M** (ADR 0009)
+
+- [ ] **P15-SQ1** `M` · Kit · **Squat computes velocity via fused-gravity; trigger
+  stays tempo/HR.** Goal: split `LiftKind` capability into `computesVelocity`
+  (true for squat too) vs `velocityDrivesAlerts` (bench/deadlift only for now);
+  `SpotEngine` runs the velocity integrator for squat and reports Mean Concentric
+  Velocity / peak / displacement, but the squat *alert* trigger stays tempo+HR
+  (ADR 0005). Done-when: a squat buffer yields non-zero velocity metrics; squat
+  Stage-1/2 still fire on tempo/HR only (a fast squat with low velocity does NOT
+  alarm); bench/deadlift unchanged; `swift test` green.
+
+- [ ] **P15-SQ2** `S` · Kit · **(parked, needs data)** Promote squat velocity to a
+  trigger (or hybrid) once raw captures (ADR 0008) validate wrist-VBT tracks bar
+  velocity. Blocked on capture + replay analysis.
+
 ### P15-D2 — Settle + rep-1 gate in segmenter — **M**
 
 - [x] **P15-D2** `M` · Kit · **Ignore setup motion; gate rep 1 per lift.** (2026-07-10)
@@ -121,7 +136,7 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ### P15-D4 — Wire Watch flow + remove grind-tap UI — **S**
 
-- [ ] **P15-D4** `S` · Watch · **`LiveSetViewModel` setup flow.** Goal: `arm()`
+- [x] **P15-D4** `S` · Watch · **`LiveSetViewModel` setup flow.** (2026-07-10) Goal: `arm()`
   enters `.settling`; auto-advance to live on the first gated rep; remove/repurpose
   any live "grind tap" affordance (`flagGrinding`/`rackIt`/controls) to match
   ADR 0005. Done-when: builds; Kit-side logic already covered by D1–D3.

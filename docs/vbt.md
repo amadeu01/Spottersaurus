@@ -80,12 +80,18 @@ boundaries.
 
 ## Which lifts use velocity
 
-Only **bench** and **deadlift** — the wrist tracks the bar, so wrist velocity ≈
-bar velocity. For **squat** the bar is on the back and the wrist is (relative to
-the bar) static, so the velocity path is disabled and detection falls back to
-concentric **tempo** + HR (see
-[`adr/0005-no-mid-rep-manual-input.md`](adr/0005-no-mid-rep-manual-input.md) and
-[`features.md`](features.md)). Velocity/displacement are reported as 0 for squat.
+**Bench** and **deadlift** use velocity as the alert trigger — the wrist tracks
+the bar, so wrist velocity ≈ bar velocity.
+
+**Squat** also *computes* velocity: the hands hold the bar on the back for the
+whole set, so the wrist rides the bar's vertical travel (wrist vertical velocity
+≈ bar vertical velocity), and fused device-motion gravity (ADR 0007) lets us
+project onto true vertical despite the tilted, leaning wrist. But squat's
+**alert trigger stays tempo + HR** until raw captures validate that wrist-VBT
+tracks bar velocity closely enough to bail on — velocity is displayed and
+captured, not yet alarmed on. See
+[`adr/0009-squat-velocity-via-fused-gravity.md`](adr/0009-squat-velocity-via-fused-gravity.md)
+and [`adr/0005-no-mid-rep-manual-input.md`](adr/0005-no-mid-rep-manual-input.md).
 
 ## Live ticks vs raw data — what "coalesce-to-latest" drops (and doesn't)
 
