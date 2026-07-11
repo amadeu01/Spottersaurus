@@ -128,6 +128,16 @@ public struct LiveTickEnvelope: Codable, Sendable, Equatable {
     public var setIndex: Int
     /// Total number of sets in the Live Session (the "M" in "Set N of M").
     public var setCount: Int
+    /// Monotonic per-session sequence number (ADR 0004: `docs/adr/
+    /// 0004-offline-reconcile-and-calibration-persistence.md`). One Watch
+    /// stamps a single increasing counter shared across both live streams —
+    /// this tick stream and `LiveSetLifecycleEnvelope` — so the iPhone
+    /// `LiveSessionState` fold can drop stale/duplicate/out-of-order
+    /// deliveries with one high-water mark. `0` is the legacy/unstamped
+    /// sentinel: absent in older wire payloads, in which case it decodes to
+    /// 0 (see `init(from:)`) and the fold treats it as "no sequence info"
+    /// rather than judging it against a real stream's mark.
+    public var sequence: Int
 
     public init(
         repCount: Int,
@@ -136,7 +146,8 @@ public struct LiveTickEnvelope: Codable, Sendable, Equatable {
         elapsedSeconds: TimeInterval,
         alertStage: AlertStage = .none,
         setIndex: Int = 0,
-        setCount: Int = 1
+        setCount: Int = 1,
+        sequence: Int = 0
     ) {
         self.repCount = repCount
         self.currentVelocityMS = currentVelocityMS
@@ -145,6 +156,28 @@ public struct LiveTickEnvelope: Codable, Sendable, Equatable {
         self.alertStage = alertStage
         self.setIndex = setIndex
         self.setCount = setCount
+        self.sequence = sequence
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case repCount, currentVelocityMS, heartRateBPM, elapsedSeconds
+        case alertStage, setIndex, setCount, sequence
+    }
+
+    /// Hand-written so older wire payloads (Watch app builds predating this
+    /// field) still decode cleanly — `sequence` defaults to 0 when the key
+    /// is absent, rather than failing the whole envelope (mirrors
+    /// `CompletedSetEnvelope.manualResolveCount`).
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        repCount = try container.decode(Int.self, forKey: .repCount)
+        currentVelocityMS = try container.decode(Double.self, forKey: .currentVelocityMS)
+        heartRateBPM = try container.decode(Double.self, forKey: .heartRateBPM)
+        elapsedSeconds = try container.decode(TimeInterval.self, forKey: .elapsedSeconds)
+        alertStage = try container.decode(AlertStage.self, forKey: .alertStage)
+        setIndex = try container.decode(Int.self, forKey: .setIndex)
+        setCount = try container.decode(Int.self, forKey: .setCount)
+        sequence = try container.decodeIfPresent(Int.self, forKey: .sequence) ?? 0
     }
 }
 
@@ -155,7 +188,7 @@ public struct LiveTickEnvelope: Codable, Sendable, Equatable {
 /// in-workout view, Live Activity, and Watch Always-On Display
 /// deterministically, replacing a tick-recency heuristic (see ADR 0001 +
 /// the "Live Set Lifecycle Event" glossary entry in `CONTEXT.md`).
-public enum LiveSetLifecycleEnvelope: Codable, Sendable, Equatable {
+public enum LiveSetLifecycleEnvelope: Sendable, Equatable {
     /// A new Live Set has started.
     case armed(
         lift: LiftKind,
@@ -164,12 +197,86 @@ public enum LiveSetLifecycleEnvelope: Codable, Sendable, Equatable {
         /// Zero-based position of this set within the Live Session.
         setIndex: Int,
         /// Total number of sets in the Live Session.
-        setCount: Int
+        setCount: Int,
+        /// Monotonic per-session sequence number — see
+        /// `LiveTickEnvelope.sequence` (same ADR 0004 counter, shared across
+        /// both live streams). Defaults to 0 (legacy/unstamped).
+        sequence: Int = 0
     )
     /// The Live Set (and, when it is the last set, the whole Live Session)
-    /// has ended — racked or completed. Carries no payload; `SessionEnvelope`
-    /// is the source of truth for the finished-set summary.
-    case ended
+    /// has ended — racked or completed. Carries no payload beyond the
+    /// sequence stamp; `SessionEnvelope` is the source of truth for the
+    /// finished-set summary.
+    case ended(sequence: Int = 0)
+
+    /// This event's monotonic sequence stamp, regardless of which case it
+    /// is — the single number `LiveSessionState`'s idempotency gate reads.
+    public var sequence: Int {
+        switch self {
+        case let .armed(_, _, _, _, _, sequence):
+            return sequence
+        case let .ended(sequence):
+            return sequence
+        }
+    }
+}
+
+extension LiveSetLifecycleEnvelope: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case armed, ended
+    }
+
+    private enum ArmedCodingKeys: String, CodingKey {
+        case lift, targetReps, weightKg, setIndex, setCount, sequence
+    }
+
+    private enum EndedCodingKeys: String, CodingKey {
+        case sequence
+    }
+
+    /// Hand-written (rather than relying on Codable's default enum
+    /// synthesis) so older wire payloads — Watch app builds predating ADR
+    /// 0004 — still decode cleanly: `sequence` defaults to 0 when the key is
+    /// absent from either case's nested payload, rather than failing the
+    /// whole envelope.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let armedContainer = try? container.nestedContainer(keyedBy: ArmedCodingKeys.self, forKey: .armed) {
+            let lift = try armedContainer.decode(LiftKind.self, forKey: .lift)
+            let targetReps = try armedContainer.decode(Int.self, forKey: .targetReps)
+            let weightKg = try armedContainer.decode(Double.self, forKey: .weightKg)
+            let setIndex = try armedContainer.decode(Int.self, forKey: .setIndex)
+            let setCount = try armedContainer.decode(Int.self, forKey: .setCount)
+            let sequence = try armedContainer.decodeIfPresent(Int.self, forKey: .sequence) ?? 0
+            self = .armed(lift: lift, targetReps: targetReps, weightKg: weightKg, setIndex: setIndex, setCount: setCount, sequence: sequence)
+        } else if let endedContainer = try? container.nestedContainer(keyedBy: EndedCodingKeys.self, forKey: .ended) {
+            let sequence = try endedContainer.decodeIfPresent(Int.self, forKey: .sequence) ?? 0
+            self = .ended(sequence: sequence)
+        } else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .armed,
+                in: container,
+                debugDescription: "Unrecognized LiveSetLifecycleEnvelope payload — expected an \"armed\" or \"ended\" key."
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .armed(lift, targetReps, weightKg, setIndex, setCount, sequence):
+            var nested = container.nestedContainer(keyedBy: ArmedCodingKeys.self, forKey: .armed)
+            try nested.encode(lift, forKey: .lift)
+            try nested.encode(targetReps, forKey: .targetReps)
+            try nested.encode(weightKg, forKey: .weightKg)
+            try nested.encode(setIndex, forKey: .setIndex)
+            try nested.encode(setCount, forKey: .setCount)
+            try nested.encode(sequence, forKey: .sequence)
+        case let .ended(sequence):
+            var nested = container.nestedContainer(keyedBy: EndedCodingKeys.self, forKey: .ended)
+            try nested.encode(sequence, forKey: .sequence)
+        }
+    }
 }
 
 /// A live control message from iPhone to Watch. Commands are intentionally

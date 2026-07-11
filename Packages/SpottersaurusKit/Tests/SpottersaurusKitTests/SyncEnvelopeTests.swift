@@ -136,6 +136,57 @@ final class SyncEnvelopeTests: XCTestCase {
         XCTAssertEqual(decoded.setCount, 5)
     }
 
+    /// The pre-existing scaffold init (no sequence) must keep compiling
+    /// untouched and default `sequence` to 0 (ADR 0004).
+    func testLiveTickEnvelopeOldInitStillDefaultsSequenceToZero() {
+        let legacy = LiveTickEnvelope(
+            repCount: 3,
+            currentVelocityMS: 0.34,
+            heartRateBPM: 142,
+            elapsedSeconds: 18.7
+        )
+        XCTAssertEqual(legacy.sequence, 0)
+    }
+
+    func testLiveTickEnvelopeRoundTripsWithSequence() throws {
+        let tick = LiveTickEnvelope(
+            repCount: 2,
+            currentVelocityMS: 0.18,
+            heartRateBPM: 151,
+            elapsedSeconds: 42.3,
+            alertStage: .grinding,
+            setIndex: 2,
+            setCount: 5,
+            sequence: 7
+        )
+
+        let decoded = try roundTrip(tick)
+        XCTAssertEqual(decoded, tick)
+        XCTAssertEqual(decoded.sequence, 7)
+    }
+
+    /// Older Watch app builds shipped `LiveTickEnvelope` JSON without a
+    /// `sequence` key at all (pre-ADR-0004) — decoding that payload must not
+    /// throw, and the field must default to 0.
+    func testLiveTickEnvelopeDecodesOlderJSONWithoutSequence() throws {
+        let json = """
+        {
+            "repCount": 3,
+            "currentVelocityMS": 0.34,
+            "heartRateBPM": 142,
+            "elapsedSeconds": 18.7,
+            "alertStage": { "none": {} },
+            "setIndex": 0,
+            "setCount": 1
+        }
+        """
+        let (_, decoder) = makeCoders()
+        let decoded = try decoder.decode(LiveTickEnvelope.self, from: Data(json.utf8))
+
+        XCTAssertEqual(decoded.sequence, 0)
+        XCTAssertEqual(decoded.repCount, 3)
+    }
+
     // MARK: LiveSetLifecycleEnvelope
 
     func testLiveSetLifecycleEnvelopeArmedRoundTrips() throws {
@@ -149,27 +200,71 @@ final class SyncEnvelopeTests: XCTestCase {
 
         let decoded = try roundTrip(armed)
         XCTAssertEqual(decoded, armed)
-        if case .armed(let lift, let targetReps, let weightKg, let setIndex, let setCount) = decoded {
+        if case .armed(let lift, let targetReps, let weightKg, let setIndex, let setCount, let sequence) = decoded {
             XCTAssertEqual(lift, .squat)
             XCTAssertEqual(targetReps, 5)
             XCTAssertEqual(weightKg, 140)
             XCTAssertEqual(setIndex, 1)
             XCTAssertEqual(setCount, 4)
+            XCTAssertEqual(sequence, 0, "the scaffold init omits sequence — must default to 0 (ADR 0004)")
         } else {
             XCTFail("expected .armed, got \(decoded)")
         }
     }
 
+    func testLiveSetLifecycleEnvelopeArmedRoundTripsWithSequence() throws {
+        let armed = LiveSetLifecycleEnvelope.armed(
+            lift: .squat,
+            targetReps: 5,
+            weightKg: 140,
+            setIndex: 1,
+            setCount: 4,
+            sequence: 12
+        )
+
+        let decoded = try roundTrip(armed)
+        XCTAssertEqual(decoded, armed)
+        XCTAssertEqual(decoded.sequence, 12)
+    }
+
     func testLiveSetLifecycleEnvelopeEndedRoundTrips() throws {
-        let ended = LiveSetLifecycleEnvelope.ended
+        let ended = LiveSetLifecycleEnvelope.ended()
 
         let decoded = try roundTrip(ended)
         XCTAssertEqual(decoded, ended)
+        XCTAssertEqual(decoded.sequence, 0)
         if case .ended = decoded {
             // expected
         } else {
             XCTFail("expected .ended, got \(decoded)")
         }
+    }
+
+    func testLiveSetLifecycleEnvelopeEndedRoundTripsWithSequence() throws {
+        let ended = LiveSetLifecycleEnvelope.ended(sequence: 9)
+
+        let decoded = try roundTrip(ended)
+        XCTAssertEqual(decoded, ended)
+        XCTAssertEqual(decoded.sequence, 9)
+    }
+
+    /// Older Watch app builds shipped `LiveSetLifecycleEnvelope` JSON without
+    /// a `sequence` key in either case's nested payload — decoding must not
+    /// throw, and `sequence` must default to 0.
+    func testLiveSetLifecycleEnvelopeDecodesOlderJSONWithoutSequence() throws {
+        let armedJSON = """
+        { "armed": { "lift": "squat", "targetReps": 5, "weightKg": 140, "setIndex": 1, "setCount": 4 } }
+        """
+        let endedJSON = """
+        { "ended": {} }
+        """
+        let (_, decoder) = makeCoders()
+
+        let decodedArmed = try decoder.decode(LiveSetLifecycleEnvelope.self, from: Data(armedJSON.utf8))
+        XCTAssertEqual(decodedArmed.sequence, 0)
+
+        let decodedEnded = try decoder.decode(LiveSetLifecycleEnvelope.self, from: Data(endedJSON.utf8))
+        XCTAssertEqual(decodedEnded.sequence, 0)
     }
 
     // MARK: WatchCommandEnvelope

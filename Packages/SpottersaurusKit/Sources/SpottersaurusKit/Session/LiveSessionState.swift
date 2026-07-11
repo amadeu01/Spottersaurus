@@ -120,7 +120,42 @@ public struct LiveSessionState: Sendable, Equatable {
     /// check; `nil` means no event has ever been folded.
     public private(set) var lastEventAt: Date?
 
+    /// High-water mark of the most recently *folded* event's `sequence`
+    /// (ADR 0004: `docs/adr/0004-offline-reconcile-and-calibration-
+    /// persistence.md`). **Assumption**: ticks and Live Set Lifecycle Events
+    /// share a single monotonic counter, because one Watch produces both
+    /// streams for a session — so one high-water mark, not two, is enough
+    /// to gate either stream's deliveries idempotently.
+    ///
+    /// `sequence == 0` is the legacy/unstamped sentinel (pre-ADR-0004
+    /// payloads default to 0 via `decodeIfPresent(...) ?? 0`). A real
+    /// sequenced stream always starts at 1, so 0 never collides with a
+    /// legitimate first event — `0`-stamped events skip the idempotency gate
+    /// entirely (see `shouldFold(sequence:)`) and keep today's
+    /// last-writer-wins behavior, rather than being compared against a
+    /// high-water mark that may belong to an entirely different (real)
+    /// stream.
+    public private(set) var lastSequence: Int = 0
+
     public init() {}
+
+    /// Whether an incoming event stamped `sequence` should be folded.
+    /// Legacy/unstamped events (`sequence == 0`) always fold. A real
+    /// (`> 0`) sequence folds only if strictly newer than the last one
+    /// folded — duplicates and out-of-order stragglers (the basis for
+    /// gap-tolerant reconnect: a resend after a dropped link can't rewind
+    /// state) are dropped, leaving state unchanged.
+    private func shouldFold(sequence: Int) -> Bool {
+        guard sequence > 0 else { return true }
+        return sequence > lastSequence
+    }
+
+    /// Advances the high-water mark after folding — a no-op for
+    /// legacy/unstamped (`0`) events, which never move the mark.
+    private mutating func markFolded(sequence: Int) {
+        guard sequence > 0 else { return }
+        lastSequence = max(lastSequence, sequence)
+    }
 
     /// Folds a Live Set Lifecycle Event (`armed`/`ended`) into the session
     /// state. `armed` starts (from `.idle`) or replaces (mid-session, e.g.
@@ -129,9 +164,14 @@ public struct LiveSessionState: Sendable, Equatable {
     /// session stays live across sets. `ended` moves the phase to `.ended`
     /// (see the `Phase.resting` doc comment for why this doesn't yet
     /// distinguish "one set of many ended" from "the whole session ended").
+    ///
+    /// Idempotency gate (ADR 0004): a stale/duplicate/out-of-order event
+    /// (per `shouldFold(sequence:)`) is ignored outright — state, including
+    /// `lastEventAt`, is left completely unchanged.
     public mutating func reduce(lifecycle event: LiveSetLifecycleEnvelope, now: Date) {
+        guard shouldFold(sequence: event.sequence) else { return }
         switch event {
-        case let .armed(lift, targetReps, weightKg, setIndex, setCount):
+        case let .armed(lift, targetReps, weightKg, setIndex, setCount, _):
             identity = Identity(
                 lift: lift,
                 targetReps: targetReps,
@@ -143,6 +183,7 @@ public struct LiveSessionState: Sendable, Equatable {
         case .ended:
             phase = .ended
         }
+        markFolded(sequence: event.sequence)
         lastEventAt = now
     }
 
@@ -151,7 +192,12 @@ public struct LiveSessionState: Sendable, Equatable {
     /// delta). Updates the metrics regardless of phase — a stray tick after
     /// `ended` is simply the latest-known reading, harmless to record — but
     /// does not itself change `phase` (only lifecycle events do).
+    ///
+    /// Idempotency gate (ADR 0004): a stale/duplicate/out-of-order tick (per
+    /// `shouldFold(sequence:)`) is ignored outright — state, including
+    /// `lastEventAt`, is left completely unchanged.
     public mutating func reduce(tick: LiveTickEnvelope, now: Date) {
+        guard shouldFold(sequence: tick.sequence) else { return }
         metrics = Metrics(
             repCount: tick.repCount,
             meanConcentricVelocityMS: tick.currentVelocityMS,
@@ -161,6 +207,7 @@ public struct LiveSessionState: Sendable, Equatable {
             setIndex: tick.setIndex,
             setCount: tick.setCount
         )
+        markFolded(sequence: tick.sequence)
         lastEventAt = now
     }
 

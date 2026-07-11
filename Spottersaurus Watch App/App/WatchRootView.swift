@@ -58,14 +58,14 @@ struct WatchRootView: View {
             // out and the cursor advanced past it) — fire the session-level
             // `.ended` lifecycle event exactly once for this transition.
             if case .runningSet = oldValue, case .sessionComplete = newValue {
-                dependencies.sendLifecycle(.ended)
+                dependencies.sendLifecycle(.ended())
             }
         }
         .onDisappear {
             // "User stops" mid-session: the app is going away while a set/
             // rest was still in progress, not because it finished normally.
             if case .runningSet = screenState {
-                dependencies.sendLifecycle(.ended)
+                dependencies.sendLifecycle(.ended())
             }
         }
     }

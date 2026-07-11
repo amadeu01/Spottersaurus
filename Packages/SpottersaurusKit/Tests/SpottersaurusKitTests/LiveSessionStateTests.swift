@@ -19,9 +19,10 @@ final class LiveSessionStateTests: XCTestCase {
         targetReps: Int = 5,
         weightKg: Double = 100,
         setIndex: Int = 0,
-        setCount: Int = 3
+        setCount: Int = 3,
+        sequence: Int = 0
     ) -> LiveSetLifecycleEnvelope {
-        .armed(lift: lift, targetReps: targetReps, weightKg: weightKg, setIndex: setIndex, setCount: setCount)
+        .armed(lift: lift, targetReps: targetReps, weightKg: weightKg, setIndex: setIndex, setCount: setCount, sequence: sequence)
     }
 
     private func tick(
@@ -31,7 +32,8 @@ final class LiveSessionStateTests: XCTestCase {
         elapsedSeconds: TimeInterval = 12,
         alertStage: AlertStage = .none,
         setIndex: Int = 0,
-        setCount: Int = 3
+        setCount: Int = 3,
+        sequence: Int = 0
     ) -> LiveTickEnvelope {
         LiveTickEnvelope(
             repCount: repCount,
@@ -40,7 +42,8 @@ final class LiveSessionStateTests: XCTestCase {
             elapsedSeconds: elapsedSeconds,
             alertStage: alertStage,
             setIndex: setIndex,
-            setCount: setCount
+            setCount: setCount,
+            sequence: sequence
         )
     }
 
@@ -102,7 +105,7 @@ final class LiveSessionStateTests: XCTestCase {
         var state = LiveSessionState()
         state.reduce(lifecycle: armed(), now: t0)
         state.reduce(tick: tick(), now: t0.addingTimeInterval(1))
-        state.reduce(lifecycle: .ended, now: t0.addingTimeInterval(2))
+        state.reduce(lifecycle: .ended(), now: t0.addingTimeInterval(2))
 
         XCTAssertEqual(state.phase, .ended)
         XCTAssertEqual(state.lastEventAt, t0.addingTimeInterval(2))
@@ -117,7 +120,7 @@ final class LiveSessionStateTests: XCTestCase {
         var state = LiveSessionState()
         state.reduce(lifecycle: armed(lift: .bench, targetReps: 5, weightKg: 100, setIndex: 0, setCount: 3), now: t0)
         state.reduce(tick: tick(repCount: 5, setIndex: 0, setCount: 3), now: t0.addingTimeInterval(30))
-        state.reduce(lifecycle: .ended, now: t0.addingTimeInterval(31))
+        state.reduce(lifecycle: .ended(), now: t0.addingTimeInterval(31))
 
         let t1 = t0.addingTimeInterval(120)
         state.reduce(lifecycle: armed(lift: .bench, targetReps: 5, weightKg: 102.5, setIndex: 1, setCount: 3), now: t1)
@@ -194,11 +197,93 @@ final class LiveSessionStateTests: XCTestCase {
     func test_applyStalenessIfNeeded_alreadyEnded_isNoOp() {
         var state = LiveSessionState()
         state.reduce(lifecycle: armed(), now: t0)
-        state.reduce(lifecycle: .ended, now: t0.addingTimeInterval(1))
+        state.reduce(lifecycle: .ended(), now: t0.addingTimeInterval(1))
 
         let farFuture = t0.addingTimeInterval(LiveSessionState.staleTimeout * 10)
         state.applyStalenessIfNeeded(at: farFuture)
 
         XCTAssertEqual(state.phase, .ended)
+    }
+
+    // MARK: - idempotent fold (ADR 0004: sequence-gated dedupe)
+
+    func test_initialState_lastSequenceIsZero() {
+        let state = LiveSessionState()
+        XCTAssertEqual(state.lastSequence, 0)
+    }
+
+    func test_sequencedTicks_1_2_3_allApply_andAdvanceHighWaterMark() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(sequence: 1), now: t0)
+        state.reduce(tick: tick(repCount: 1, sequence: 2), now: t0.addingTimeInterval(1))
+        state.reduce(tick: tick(repCount: 2, sequence: 3), now: t0.addingTimeInterval(2))
+
+        XCTAssertEqual(state.lastSequence, 3)
+        XCTAssertEqual(state.metrics?.repCount, 2)
+        XCTAssertEqual(state.lastEventAt, t0.addingTimeInterval(2))
+    }
+
+    func test_duplicateSequence_isIgnored_stateUnchanged() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(sequence: 1), now: t0)
+        state.reduce(tick: tick(repCount: 1, sequence: 2), now: t0.addingTimeInterval(1))
+        state.reduce(tick: tick(repCount: 3, sequence: 3), now: t0.addingTimeInterval(2))
+        let stateAfterSeq3 = state
+
+        // Re-folding sequence 2 (already folded) must be a complete no-op —
+        // including not touching `lastEventAt`.
+        state.reduce(tick: tick(repCount: 99, sequence: 2), now: t0.addingTimeInterval(10))
+
+        XCTAssertEqual(state, stateAfterSeq3)
+        XCTAssertEqual(state.metrics?.repCount, 3, "duplicate seq 2 must not overwrite the seq-3 metrics")
+        XCTAssertEqual(state.lastSequence, 3)
+    }
+
+    func test_outOfOrderSequenceAfterNewer_isIgnored_stateMatchesLatest() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(sequence: 1), now: t0)
+        state.reduce(tick: tick(repCount: 1, sequence: 2), now: t0.addingTimeInterval(1))
+        state.reduce(tick: tick(repCount: 3, sequence: 3), now: t0.addingTimeInterval(2))
+        let stateAfterSeq3 = state
+
+        // A stale sequence-1 tick straggles in after sequence 3 already
+        // folded — must be dropped, not rewind the metrics.
+        state.reduce(tick: tick(repCount: 1, sequence: 1), now: t0.addingTimeInterval(20))
+
+        XCTAssertEqual(state, stateAfterSeq3)
+        XCTAssertEqual(state.metrics?.repCount, 3)
+        XCTAssertEqual(state.lastSequence, 3)
+    }
+
+    func test_duplicateLifecycleSequence_isIgnored() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(lift: .bench, sequence: 1), now: t0)
+        state.reduce(lifecycle: .ended(sequence: 2), now: t0.addingTimeInterval(1))
+        let stateAfterEnded = state
+
+        // A duplicate delivery of the same `armed` (seq 1) arrives late —
+        // must not reopen the session or move the phase back to `.active`.
+        state.reduce(lifecycle: armed(lift: .squat, sequence: 1), now: t0.addingTimeInterval(30))
+
+        XCTAssertEqual(state, stateAfterEnded)
+        XCTAssertEqual(state.phase, .ended)
+        XCTAssertEqual(state.identity?.lift, .bench)
+    }
+
+    /// Legacy/unstamped stream (all events default `sequence == 0`, e.g. a
+    /// pre-ADR-0004 Watch build) must NOT be dropped by the idempotency
+    /// gate — every 0-stamped event keeps folding under today's
+    /// last-writer-wins behavior, since 0 is the "no sequence info"
+    /// sentinel, not a real high-water mark to compare against.
+    func test_legacyAllZeroSequenceStream_stillFoldsLastWriterWins_notAllDropped() {
+        var state = LiveSessionState()
+        state.reduce(lifecycle: armed(), now: t0) // sequence defaults to 0
+        state.reduce(tick: tick(repCount: 1), now: t0.addingTimeInterval(1))
+        state.reduce(tick: tick(repCount: 2), now: t0.addingTimeInterval(2))
+        state.reduce(tick: tick(repCount: 3), now: t0.addingTimeInterval(3))
+
+        XCTAssertEqual(state.metrics?.repCount, 3, "every 0-stamped tick should still fold — last writer wins")
+        XCTAssertEqual(state.lastEventAt, t0.addingTimeInterval(3))
+        XCTAssertEqual(state.lastSequence, 0, "legacy 0-stamped events never advance the high-water mark")
     }
 }
