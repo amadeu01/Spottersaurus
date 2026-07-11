@@ -201,16 +201,20 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### P2-4 — `SessionTransport` port + domain — **XL** → split
 
-- [ ] **P2-4a** `M` · Kit · **Define the `SessionTransport` port.**
+- [x] **P2-4a** `M` · Kit · **Define the `SessionTransport` port.** (2026-07-10)
   Goal: protocol for send/receive/reachability + reconcile hooks; relocate the
   envelope + `LiveTickCoalescer` under it. Done-when: port compiles in Kit,
   macOS-testable, no WatchConnectivity import.
-- [ ] **P2-4b** `M` · Kit · **Pure transport core.**
+- [x] **P2-4b** `M` · Kit · **Pure transport core.** (2026-07-10)
   Goal: send/queue/fallback/coalesce decision logic as a pure type driving the
   port. Done-when: tests cover coalesce-to-latest + fallback ordering.
-- [ ] **P2-4c** `M` · Kit · **Durable offline queue semantics.**
-  Goal: model the durable-queue + reachable-vs-queued decision. Done-when: tests
-  cover queued-while-unreachable then flush-on-reachable.
+- [x] **P2-4c** `M` · Kit · **Durable offline queue — satisfied by the OS.** (2026-07-10)
+  **Re-scoped:** WCSession `transferUserInfo`/`transferFile` are already durable,
+  serial/FIFO, persist across app launches, and deliver when the peer becomes
+  reachable — no app-level queue to build. The core's `.sendDurable` action maps
+  to those OS mechanisms in the adapter (P2-5); `updateApplicationContext` covers
+  latest-wins state (planned session). No Kit code; verification is the P2-5
+  adapter on device (these transfers don't run in the watchOS Simulator).
 
 ### P2-5 — App adapters — **L** → split
 
