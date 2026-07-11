@@ -326,10 +326,72 @@ final class DetectionTests: XCTestCase {
         let engine = SpotEngine(lift: .squat, calibration: calib)
         let analysis = engine.process(motion: motion)
 
-        XCTAssertFalse(analysis.usedVelocityPath, "squat must NOT use the velocity path")
+        XCTAssertFalse(analysis.usedVelocityPath, "squat must NOT use the velocity path for its trigger")
         XCTAssertTrue(analysis.events.isEmpty, "a clean squat set must not fire any event; got \(analysis.events)")
         XCTAssertFalse(analysis.reps.contains { $0.flaggedStall })
-        // The velocity path is disabled: no VBT numbers should be reported.
-        XCTAssertTrue(analysis.reps.allSatisfy { $0.meanVelocityMS == 0 && $0.peakVelocityMS == 0 })
+    }
+
+    // MARK: - Engine: squat velocity (ADR 0009 — computed, but does not trigger)
+
+    /// Squat's wrist rides the bar (ADR 0009), so `SpotEngine` must now report
+    /// real Mean/Peak Concentric Velocity and displacement for squat reps —
+    /// even though the trigger stays tempo/HR (`usedVelocityPath` is false).
+    func testSquatComputesVelocity() {
+        let calib = squatCalibration()
+        let motion = cleanSet(reps: 3, amplitude: 0.4, concentric: 0.9)
+
+        let engine = SpotEngine(lift: .squat, calibration: calib)
+        let analysis = engine.process(motion: motion)
+
+        XCTAssertFalse(analysis.usedVelocityPath, "squat's trigger still must not be velocity-driven")
+        XCTAssertEqual(analysis.reps.count, 3)
+        for rep in analysis.reps {
+            XCTAssertGreaterThan(rep.meanVelocityMS, 0, "squat velocity should now be computed, not hardcoded to 0")
+            XCTAssertGreaterThan(rep.peakVelocityMS, 0)
+            XCTAssertGreaterThan(rep.displacementM, 0)
+        }
+    }
+
+    /// A squat rep with a normal tempo but a deliberately weak/slow bar speed
+    /// must NOT alarm: velocity is reported but must never feed the squat
+    /// trigger, which stays tempo + HR only (ADR 0009).
+    func testSquatNormalTempoLowVelocityDoesNotAlarm() {
+        let calib = squatCalibration()
+
+        var b = MotionBuilder()
+        b.still(0.4)
+        b.bump(amplitude: -0.2, duration: 0.9)   // eccentric
+        b.bump(amplitude: 0.2, duration: 0.9)    // normal tempo, deliberately weak bar speed
+        b.still(0.4)
+
+        let engine = SpotEngine(lift: .squat, calibration: calib)
+        let analysis = engine.process(motion: b.samples)
+
+        XCTAssertFalse(analysis.usedVelocityPath)
+        XCTAssertGreaterThan(analysis.reps.first?.meanVelocityMS ?? 0, 0, "velocity is still reported")
+        XCTAssertLessThan(analysis.reps.first?.meanVelocityMS ?? 0, 0.15, "velocity should read as weak/slow")
+        XCTAssertTrue(analysis.events.isEmpty, "low velocity alone must not trigger a squat alert; got \(analysis.events)")
+        XCTAssertFalse(analysis.reps.contains { $0.flaggedStall })
+    }
+
+    /// A squat rep with fast bar speed but a blown tempo must still RACK IT:
+    /// tempo alone drives the squat trigger, regardless of how fast the
+    /// (now-computed) velocity number looks.
+    func testSquatFastVelocityWithBlownTempoStillRacksIt() {
+        let calib = squatCalibration()
+
+        var b = MotionBuilder()
+        b.still(0.4)
+        b.bump(amplitude: -0.4, duration: 0.9)   // eccentric
+        b.bump(amplitude: 1.2, duration: 2.2)    // fast bar speed, but still an extreme tempo blowout
+        b.still(0.4)
+
+        let engine = SpotEngine(lift: .squat, calibration: calib)
+        let analysis = engine.process(motion: b.samples) // no hr at all
+
+        XCTAssertFalse(analysis.usedVelocityPath, "squat must NOT use the velocity path")
+        XCTAssertGreaterThan(analysis.reps.first?.meanVelocityMS ?? 0, 0.3, "velocity should read as fast, not suppressed")
+        XCTAssertTrue(analysis.events.contains { $0.kind == .rackIt }, "tempo blowout must still escalate to RACK IT even with a fast velocity reading")
+        XCTAssertEqual(analysis.events.first { $0.kind == .rackIt }?.reason, .sustainedPin, "driven by tempo, never by velocity")
     }
 }

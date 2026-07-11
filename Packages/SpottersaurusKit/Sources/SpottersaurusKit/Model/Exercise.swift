@@ -45,6 +45,15 @@ public final class Exercise {
     /// detection path stays single-sourced in `LiftKind`.
     public var barTracking: BarTracking { kind.barTracking }
 
-    /// Whether the wrist-velocity (VBT) path is available for this exercise.
-    public var usesVelocityPath: Bool { kind.usesVelocityPath }
+    /// Whether wrist-velocity (VBT) drives the alert trigger for this exercise
+    /// (see `LiftKind.velocityDrivesAlerts`).
+    public var velocityDrivesAlerts: Bool { kind.velocityDrivesAlerts }
+
+    /// Whether `SpotEngine` computes and reports a velocity number for this
+    /// exercise (see `LiftKind.computesVelocity`).
+    public var computesVelocity: Bool { kind.computesVelocity }
+
+    /// Deprecated alias of `velocityDrivesAlerts` (ADR 0009).
+    @available(*, deprecated, renamed: "velocityDrivesAlerts")
+    public var usesVelocityPath: Bool { kind.velocityDrivesAlerts }
 }

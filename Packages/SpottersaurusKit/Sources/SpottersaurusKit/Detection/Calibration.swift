@@ -72,7 +72,10 @@ public struct Calibration: Sendable {
 
         var lower = 0.0
         var upper = 0.0
-        if lift.usesVelocityPath {
+        // The velocity band only feeds the velocity-driven Stage 1 "weak"
+        // gate (see SpotEngine.analyzeVelocityPath); squat computes velocity
+        // now (ADR 0009) but does not trigger on it, so its band stays 0.
+        if lift.velocityDrivesAlerts {
             let integrator = VelocityIntegrator(config: config)
             let means = phases.map { integrator.integrate(linear, over: $0).meanMS }
             let meanVel = means.reduce(0, +) / Double(means.count)

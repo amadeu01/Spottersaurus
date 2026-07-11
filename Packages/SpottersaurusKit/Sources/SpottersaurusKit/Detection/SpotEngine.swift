@@ -12,13 +12,16 @@
 //  Stage 2 (RACK IT): the grind persists — sustained near-zero velocity with no
 //  lockout inside the max-concentric window (> T2 × baseline).
 //
-//  Wrist-tracked lifts (bench, deadlift) use the velocity path. Back-loaded
-//  lifts (squat) disable velocity entirely and fall back to rep tempo plus an
-//  injected HR-spike signal — there is no mid-rep manual input (ADR 0005): a
-//  lifter's hands are locked on the bar for the entire working set, so a
-//  "grind tap" gesture is physically impossible during a rep. Defaults are
-//  conservative: prefer missing a borderline rep over startling a lifter
-//  mid-clean-rep.
+//  Wrist-tracked lifts (bench, deadlift) *trigger* on the velocity path.
+//  Back-loaded squat computes velocity too (ADR 0009 — the wrist rides the
+//  bar) but does not yet trust it to trigger; its alerts fall back to rep
+//  tempo plus an injected HR-spike signal — there is no mid-rep manual input
+//  either (ADR 0005): a lifter's hands are locked on the bar for the entire
+//  working set, so a "grind tap" gesture is physically impossible during a
+//  rep. Defaults are conservative: prefer missing a borderline rep over
+//  startling a lifter mid-clean-rep. `LiftKind.computesVelocity` selects
+//  whether a velocity number is reported at all; `LiftKind.velocityDrivesAlerts`
+//  separately selects whether that number is allowed to trigger Stage 1/2.
 //
 
 import Foundation
@@ -199,7 +202,7 @@ public struct SpotEngine: Sendable {
     ) -> SpotAnalysis {
         let linear = GravityRemover.axialAcceleration(motion, timeConstant: config.gravityTimeConstant)
         let phases = RepSegmenter(config: config).segment(linear, lift: lift)
-        let usesVelocity = lift.usesVelocityPath
+        let velocityDrivesAlerts = lift.velocityDrivesAlerts
 
         var events: [SpotEvent] = []
         var reps: [RepResult] = []
@@ -209,27 +212,30 @@ public struct SpotEngine: Sendable {
         let integrator = VelocityIntegrator(config: config)
 
         for phase in phases {
+            // Compute velocity for every phase whenever the lift supports it
+            // (ADR 0009 — squat's wrist rides the bar, so this is meaningful
+            // for squat too), independent of whether it drives the trigger.
+            let cv = lift.computesVelocity ? integrator.integrate(linear, over: phase) : .zero
+
             let (evs, rep): ([SpotEvent], RepResult)
-            if usesVelocity {
-                (evs, rep) = analyzeVelocityPath(phase: phase, linear: linear, integrator: integrator)
+            if velocityDrivesAlerts {
+                (evs, rep) = analyzeVelocityPath(phase: phase, cv: cv)
             } else {
-                (evs, rep) = analyzeTempoPath(phase: phase, hr: hr, baseHR: baseHR)
+                (evs, rep) = analyzeTempoPath(phase: phase, hr: hr, baseHR: baseHR, cv: cv)
             }
             events.append(contentsOf: evs)
             reps.append(rep)
         }
 
-        return SpotAnalysis(events: events, reps: reps, usedVelocityPath: usesVelocity)
+        return SpotAnalysis(events: events, reps: reps, usedVelocityPath: velocityDrivesAlerts)
     }
 
     // MARK: - Velocity path (bench / deadlift)
 
     private func analyzeVelocityPath(
         phase: RepPhase,
-        linear: [LinearSample],
-        integrator: VelocityIntegrator
+        cv: ConcentricVelocity
     ) -> ([SpotEvent], RepResult) {
-        let cv = integrator.integrate(linear, over: phase)
         let duration = phase.concentricSeconds
         let baseline = Swift.max(calibration.baselineConcentricSeconds, 1e-3)
         let ratio = duration / baseline
@@ -298,7 +304,8 @@ public struct SpotEngine: Sendable {
     private func analyzeTempoPath(
         phase: RepPhase,
         hr: [HRSample],
-        baseHR: Double
+        baseHR: Double,
+        cv: ConcentricVelocity
     ) -> ([SpotEvent], RepResult) {
         let duration = phase.concentricSeconds
         let baseline = Swift.max(calibration.baselineConcentricSeconds, 1e-3)
@@ -358,9 +365,12 @@ public struct SpotEngine: Sendable {
         let rep = RepResult(
             repIndex: phase.index,
             concentricSeconds: duration,
-            meanVelocityMS: 0,
-            peakVelocityMS: 0,
-            displacementM: 0,
+            // Reported (ADR 0009) but does NOT feed stage1/stage2 above —
+            // squat's trigger stays tempo + HR until wrist-VBT is validated
+            // against real captures.
+            meanVelocityMS: cv.meanMS,
+            peakVelocityMS: cv.peakMS,
+            displacementM: cv.displacementM,
             flaggedStall: stage1,
             reachedRackIt: stage2
         )

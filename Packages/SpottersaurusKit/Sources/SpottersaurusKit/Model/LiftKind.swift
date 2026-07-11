@@ -68,10 +68,36 @@ public enum LiftKind: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    /// Whether the wrist-velocity (VBT) path is available for this lift.
-    public var usesVelocityPath: Bool {
+    /// Whether wrist-velocity (VBT) *drives the alert trigger* for this lift —
+    /// i.e. whether `SpotEngine` gates Stage 1/2 on velocity/stall (bench,
+    /// deadlift) rather than tempo + HR (squat). Distinct from
+    /// `computesVelocity`: see ADR 0009 — squat's wrist rides the bar and so
+    /// yields a real, reportable velocity, but that number is not yet trusted
+    /// to fire the safety-critical RACK IT trigger, pending validation against
+    /// real captures.
+    public var velocityDrivesAlerts: Bool {
         barTracking == .wristTracked
     }
+
+    /// Whether `SpotEngine` computes and reports concentric velocity for this
+    /// lift at all (independent of whether it drives alerts). True for every
+    /// lift here: bench and deadlift are wrist-tracked in the ordinary VBT
+    /// sense, and squat's hands are locked on the bar the whole rep, so wrist
+    /// vertical velocity ≈ bar vertical velocity via the fused-gravity vertical
+    /// projection (ADR 0009). Accessory follows its wrist-tracked profile.
+    public var computesVelocity: Bool {
+        switch self {
+        case .squat, .bench, .deadlift: true
+        case .accessory: barTracking == .wristTracked
+        }
+    }
+
+    /// Deprecated alias of `velocityDrivesAlerts`, kept because it conflated
+    /// "compute velocity" and "trigger on velocity" — see ADR 0009. Prefer
+    /// `velocityDrivesAlerts` (trigger selection) or `computesVelocity`
+    /// (whether the engine reports a velocity number at all).
+    @available(*, deprecated, renamed: "velocityDrivesAlerts")
+    public var usesVelocityPath: Bool { velocityDrivesAlerts }
 
     /// The rep-1 gate `RepSegmenter` applies after the post-arm settle
     /// (ADR 0006). Squat and bench start with the bar racked/held at the
