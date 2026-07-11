@@ -30,8 +30,8 @@ final class LiveSetViewModel {
 
     private var lifecycle: SetLifecycleController
     private var calibrationState: LiveSetCalibrationState
-    private var warmupMotionSamples: [MotionSample] = []
-    private var motionSamples: [MotionSample] = []
+    private var warmupMotionSamples: [DeviceMotionSample] = []
+    private var motionSamples: [DeviceMotionSample] = []
     private var heartRateSamples: [HRSample] = []
 
     /// Wall-clock (not set-relative) ingest timestamps, kept only for the
@@ -319,13 +319,13 @@ final class LiveSetViewModel {
         lifecycle.handle(spotEvent: spotEvent(kind: .resolved, confidence: 1, reason: .manualTap))
     }
 
-    func ingestMotionSamples(_ samples: [MotionSample]) {
+    func ingestMotionSamples(_ samples: [DeviceMotionSample]) {
         recordMotionIngestTelemetry(count: samples.count)
 
         if calibrationState.isCollecting {
             warmupMotionSamples.append(contentsOf: samples)
             trimWarmupSamples()
-            let candidate = Calibration().calibrate(lift: lift, warmupMotion: warmupMotionSamples)
+            let candidate = Calibration().calibrate(lift: lift, warmupDeviceMotion: warmupMotionSamples)
             calibrationState = .collecting(candidate: candidate)
             return
         }
@@ -334,7 +334,7 @@ final class LiveSetViewModel {
         motionSamples.append(contentsOf: samples)
         trimSamples()
 
-        let analysis = spotEngine.process(motion: motionSamples, hr: heartRateSamples)
+        let analysis = spotEngine.process(deviceMotion: motionSamples, hr: heartRateSamples)
         for rep in analysis.reps where rep.repIndex >= processedRepCount {
             lifecycle.repCompleted()
             repMetrics.append(

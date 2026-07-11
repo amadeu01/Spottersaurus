@@ -63,9 +63,23 @@ public struct Calibration: Sendable {
         self.config = config
     }
 
-    /// Calibrates a lift from a buffer of clean warmup reps.
+    /// Calibrates a lift from a buffer of clean warmup reps (raw-accelerometer
+    /// front end).
     public func calibrate(lift: LiftKind, warmupMotion: [MotionSample]) -> CalibrationValues {
         let linear = GravityRemover.axialAcceleration(warmupMotion, timeConstant: config.gravityTimeConstant)
+        let phases = RepSegmenter(config: config).segment(linear, lift: lift)
+        return calibrate(lift: lift, linear: linear, phases: phases)
+    }
+
+    /// Calibrates a lift from a buffer of clean warmup reps (fused
+    /// device-motion front end, ADR 0007). Projects onto CoreMotion's own
+    /// gravity vector (no EMA lag) and runs the identical downstream — the
+    /// shared `calibrate(lift:linear:phases:)` core below — so raw and
+    /// device-motion warmups are calibrated by exactly one code path from
+    /// `[LinearSample]` onward, matching `SpotEngine`'s two `process`
+    /// overloads.
+    public func calibrate(lift: LiftKind, warmupDeviceMotion: [DeviceMotionSample]) -> CalibrationValues {
+        let linear = GravityRemover.axialAcceleration(deviceMotion: warmupDeviceMotion)
         let phases = RepSegmenter(config: config).segment(linear, lift: lift)
         return calibrate(lift: lift, linear: linear, phases: phases)
     }

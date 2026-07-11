@@ -165,6 +165,50 @@ final class ReplayTests: XCTestCase {
         )
     }
 
+    // MARK: - Calibration: device-motion overload (ADR 0007, P15-S2)
+
+    /// A device-motion warmup buffer must yield the same calibration shape
+    /// as the equivalent raw-accelerometer warmup — both
+    /// `Calibration.calibrate` overloads feed the same shared
+    /// `calibrate(lift:linear:phases:)` core.
+    func testDeviceMotionCalibrationMatchesRawCalibrationShape() {
+        let rawCalib = Calibration().calibrate(lift: .bench, warmupMotion: cleanRawMotion(reps: 3))
+        let deviceCalib = Calibration().calibrate(lift: .bench, warmupDeviceMotion: cleanDeviceMotion(reps: 3))
+
+        // The raw front end's EMA gravity estimate still has some settling
+        // lag versus the fused front end's per-sample gravity vector, so the
+        // two calibrations land in the same ballpark rather than bit-exact
+        // — this is asserting "same calibration shape", not numeric parity.
+        XCTAssertEqual(deviceCalib.repCount, rawCalib.repCount)
+        XCTAssertEqual(
+            deviceCalib.baselineConcentricSeconds, rawCalib.baselineConcentricSeconds,
+            accuracy: 0.2 * rawCalib.baselineConcentricSeconds
+        )
+        XCTAssertEqual(
+            deviceCalib.velocityBandLowerMS, rawCalib.velocityBandLowerMS,
+            accuracy: 0.2 * rawCalib.velocityBandLowerMS
+        )
+        XCTAssertEqual(
+            deviceCalib.velocityBandUpperMS, rawCalib.velocityBandUpperMS,
+            accuracy: 0.2 * rawCalib.velocityBandUpperMS
+        )
+        XCTAssertGreaterThan(deviceCalib.velocityBandLowerMS, 0)
+    }
+
+    /// Squat's device-motion calibration must disable the velocity band, the
+    /// same as the raw-accelerometer path (velocity is computed but does not
+    /// drive squat's trigger — ADR 0009).
+    func testSquatDeviceMotionCalibrationDisablesVelocityBand() {
+        let calib = Calibration().calibrate(
+            lift: .squat,
+            warmupDeviceMotion: cleanDeviceMotion(reps: 3, amplitude: 0.4, concentric: 0.9)
+        )
+        XCTAssertEqual(calib.velocityBandLowerMS, 0)
+        XCTAssertEqual(calib.velocityBandUpperMS, 0)
+        XCTAssertGreaterThan(calib.baselineConcentricSeconds, 0)
+        XCTAssertEqual(calib.repCount, 3)
+    }
+
     // MARK: - process(deviceMotion:) shares the downstream with process(motion:)
 
     /// A clean device-motion set must stay silent through the new entry

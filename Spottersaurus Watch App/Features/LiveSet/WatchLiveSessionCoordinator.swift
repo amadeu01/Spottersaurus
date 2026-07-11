@@ -44,7 +44,7 @@ final class WatchLiveSessionCoordinator {
         logger: any AppLogger = LoggerGroup.watch,
         onLiveTick: @escaping @MainActor (LiveTickEnvelope) -> Void = { _ in }
     ) {
-        motionAdapter.start(logger: logger) { samples in
+        motionAdapter.start(logger: logger) { (samples: [DeviceMotionSample]) in
             viewModel.ingestMotionSamples(samples)
             let envelope = viewModel.liveTickEnvelope
             if self.tickGate.shouldSend(envelope) {
