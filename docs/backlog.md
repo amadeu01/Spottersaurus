@@ -152,7 +152,7 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### PRC-1 — Capture format + exporter — **M**
 
-- [ ] **PRC-1** `M` · Kit · **Versioned capture container + NDJSON/CSV export.**
+- [x] **PRC-1** `M` · Kit · **Versioned capture container + NDJSON/CSV export.** (2026-07-10)
   Goal: a `Codable` `RawSetCapture` (schema version, session id, set id, lift,
   arm date, `[DeviceMotionSample]`, `[HRSample]`, lifecycle markers) with compact
   binary encode/decode and an NDJSON/CSV exporter. Done-when: round-trip +
