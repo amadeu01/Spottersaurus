@@ -91,16 +91,18 @@ the walkout counts as a rep and squat leans on an impossible tap.
 
 ### P15-S3 — Rotation/attitude gating in detection — **M** (ADR 0007)
 
-- [ ] **P15-S3** `M` · Kit · **Use rotation/attitude to reject non-rep motion.**
-  Goal: `RepSegmenter`/`SpotEngine` use `rotationRate`/`attitude` to reject
-  walkout/torso-sway and improve the squat path + rep-1 gate. Done-when: a
-  synthetic walkout-with-rotation buffer yields no reps while clean vertical reps
-  still segment; `swift test` green. (Layers on P15-D2/D3.)
+- [ ] **P15-S3** `M` · Kit · **(defer — needs real captures)** Use rotation/attitude
+  to reject non-rep motion. Goal: `RepSegmenter`/`SpotEngine` use
+  `rotationRate`/`attitude` to reject walkout/torso-sway. The rejection threshold
+  is a hand-tuned heuristic best set from real captures (ADR 0008) rather than
+  synthetic guesses — deferred alongside P15-SQ2 until on-device data exists.
+  Done-when: walkout-with-rotation buffer yields no reps while clean reps segment;
+  `swift test` green.
 
 ### P15-SQ1 — Compute squat velocity (don't trigger on it yet) — **M** (ADR 0009)
 
-- [ ] **P15-SQ1** `M` · Kit · **Squat computes velocity via fused-gravity; trigger
-  stays tempo/HR.** Goal: split `LiftKind` capability into `computesVelocity`
+- [x] **P15-SQ1** `M` · Kit · **Squat computes velocity via fused-gravity; trigger
+  stays tempo/HR.** (2026-07-10) Goal: split `LiftKind` capability into `computesVelocity`
   (true for squat too) vs `velocityDrivesAlerts` (bench/deadlift only for now);
   `SpotEngine` runs the velocity integrator for squat and reports Mean Concentric
   Velocity / peak / displacement, but the squat *alert* trigger stays tempo+HR
