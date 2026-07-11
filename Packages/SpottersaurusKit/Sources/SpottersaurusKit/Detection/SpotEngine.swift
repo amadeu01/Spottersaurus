@@ -194,13 +194,41 @@ public struct SpotEngine: Sendable {
         self.config = config
     }
 
-    /// Analyses a set: segments reps, runs the per-lift stage machine, and emits
-    /// the event stream plus per-rep metrics.
+    /// Analyses a set from the raw-accelerometer front end: segments reps,
+    /// runs the per-lift stage machine, and emits the event stream plus
+    /// per-rep metrics.
     public func process(
         motion: [MotionSample],
         hr: [HRSample] = []
     ) -> SpotAnalysis {
         let linear = GravityRemover.axialAcceleration(motion, timeConstant: config.gravityTimeConstant)
+        return analyze(linear: linear, hr: hr)
+    }
+
+    /// Analyses a set from the fused device-motion front end (ADR 0007):
+    /// projects `userAcceleration` onto CoreMotion's own gravity vector (no
+    /// EMA lag), then runs the exact same downstream as `process(motion:hr:)`
+    /// — segmentation, per-phase velocity/tempo analysis, and event assembly
+    /// — so there is a single code path from `[LinearSample]` onward
+    /// regardless of which sensor front end fed it. This is also what
+    /// `replay(_:calibration:config:)` (ADR 0008) drives a stored
+    /// `RawSetCapture` through.
+    public func process(
+        deviceMotion: [DeviceMotionSample],
+        hr: [HRSample] = []
+    ) -> SpotAnalysis {
+        let linear = GravityRemover.axialAcceleration(deviceMotion: deviceMotion)
+        return analyze(linear: linear, hr: hr)
+    }
+
+    /// The shared downstream from `[LinearSample]` onward: segmentation, the
+    /// per-lift stage machine, and event/metric assembly. Both `process`
+    /// overloads above call this so raw-accelerometer and fused device-motion
+    /// input are analyzed by exactly one code path.
+    private func analyze(
+        linear: [LinearSample],
+        hr: [HRSample]
+    ) -> SpotAnalysis {
         let phases = RepSegmenter(config: config).segment(linear, lift: lift)
         let velocityDrivesAlerts = lift.velocityDrivesAlerts
 
@@ -430,5 +458,43 @@ public struct SpotEngine: Sendable {
     private func hrSpiked(_ hr: [HRSample], from: TimeInterval, to: TimeInterval, baseHR: Double) -> Bool {
         guard baseHR > 0 else { return false }
         return hr.contains { $0.timestamp >= from && $0.timestamp <= to && $0.beatsPerMinute > baseHR + config.hrSpikeBPM }
+    }
+}
+
+// MARK: - Replay (ADR 0008)
+
+extension SpotEngine {
+    /// Reprocesses a stored `RawSetCapture` (PRC-1) back through the engine
+    /// to reproduce its detection events/metrics deterministically — the
+    /// core debug/tuning loop for a recorded set. Constructs an engine for
+    /// `capture.lift` and feeds `capture.motion` + `capture.heartRate`
+    /// through the fused device-motion front end (`process(deviceMotion:hr:)`),
+    /// the exact same one the Watch's live feed drives (ADR 0007) — so replay
+    /// and the original live run share one code path from `[LinearSample]`
+    /// onward.
+    ///
+    /// Pure function of its inputs: replaying the same capture with the same
+    /// `calibration`/`config` always yields an `==` `SpotAnalysis`.
+    ///
+    /// - Parameters:
+    ///   - capture: the recorded set to replay.
+    ///   - calibration: the baseline to judge reps against. A capture does
+    ///     not (yet) persist the `CalibrationValues` snapshot that was live
+    ///     at record time, so this defaults to `.fallback(for: capture.lift)`
+    ///     — pass the actual profile/session-override values used at capture
+    ///     time when known, for a faithful reproduction of the live call.
+    ///   - config: detection thresholds; defaults to `.conservative`, the
+    ///     same default `SpotEngine.init` uses.
+    public static func replay(
+        _ capture: RawSetCapture,
+        calibration: CalibrationValues? = nil,
+        config: SpotConfig = .conservative
+    ) -> SpotAnalysis {
+        let engine = SpotEngine(
+            lift: capture.lift,
+            calibration: calibration ?? .fallback(for: capture.lift),
+            config: config
+        )
+        return engine.process(deviceMotion: capture.motion, hr: capture.heartRate)
     }
 }

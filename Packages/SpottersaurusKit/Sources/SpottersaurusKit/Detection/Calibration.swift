@@ -38,6 +38,21 @@ public struct CalibrationValues: Sendable, Equatable {
         self.velocityBandUpperMS = velocityBandUpperMS
         self.repCount = repCount
     }
+
+    /// A conservative per-lift default used before any warmup calibration has
+    /// run (or when one produced no usable reps) — e.g. `SpotEngine.replay`'s
+    /// default calibration source when a `RawSetCapture` doesn't carry the
+    /// `CalibrationValues` snapshot that was live at record time (see
+    /// ADR 0008). Values mirror the Watch's own pre-warmup fallback baseline.
+    public static func fallback(for lift: LiftKind) -> CalibrationValues {
+        CalibrationValues(
+            lift: lift,
+            baselineConcentricSeconds: 1.0,
+            velocityBandLowerMS: lift.velocityDrivesAlerts ? 0.18 : 0,
+            velocityBandUpperMS: lift.velocityDrivesAlerts ? 0.75 : 0,
+            repCount: 0
+        )
+    }
 }
 
 /// Derives `CalibrationValues` from warmup motion.
