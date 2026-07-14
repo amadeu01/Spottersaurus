@@ -160,7 +160,7 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### PRC-2 — Watch capture recorder — **M**
 
-- [ ] **PRC-2** `M` · Watch · **Buffer arm→end per set; `transferFile` on end.**
+- [x] **PRC-2** `M` · Watch · **Buffer arm→end per set; `transferFile` on end.** (2026-07-13)
   Goal: record all device-motion + HR samples for the set (incl. setup), write a
   `RawSetCapture` file, `WCSession.transferFile` it when the set ends. Bounded
   memory / streamed to disk. Done-when: on-device a completed set produces a file
