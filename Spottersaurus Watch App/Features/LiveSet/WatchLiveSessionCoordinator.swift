@@ -7,6 +7,13 @@ final class WatchLiveSessionCoordinator {
     private let motionAdapter = WatchMotionStreamAdapter()
     private let authorizer: any HealthKitAuthorizing
     private var tickGate = LiveTickGate()
+    /// Full-set raw sensor buffer (PRC-2 / ADR 0008). Fed the SAME
+    /// motion/HR samples as `viewModel` below, but unlike the VM — which trims
+    /// to a 30 s rolling window — this keeps the entire arm→end stream so the
+    /// completed set can be transferred as a file for offline replay. Bounded
+    /// to one set: `begin` resets it, and appends are dropped until a capture
+    /// is in progress, so warmup samples before arm never leak in.
+    private let captureRecorder = RawSetCaptureRecorder()
 
     /// `authorizer` is injectable (defaulting to the real `HealthKitAuthorizer`)
     /// so the "ask once" gate and status queries stay consistent with C1/C2 —
@@ -46,6 +53,9 @@ final class WatchLiveSessionCoordinator {
     ) {
         motionAdapter.start(logger: logger) { (samples: [DeviceMotionSample]) in
             viewModel.ingestMotionSamples(samples)
+            // Full-set capture buffer (PRC-2): a no-op until a capture is in
+            // progress, so warmup streaming before arm is not recorded.
+            self.captureRecorder.appendMotion(samples)
             let envelope = viewModel.liveTickEnvelope
             if self.tickGate.shouldSend(envelope) {
                 onLiveTick(envelope)
@@ -65,6 +75,7 @@ final class WatchLiveSessionCoordinator {
             do {
                 try await workoutAdapter.start(logger: logger) { sample in
                     viewModel.ingestHeartRate(sample)
+                    self.captureRecorder.appendHeartRate(sample)
                     let envelope = viewModel.liveTickEnvelope
                     if self.tickGate.shouldSend(envelope) {
                         onLiveTick(envelope)
@@ -89,6 +100,42 @@ final class WatchLiveSessionCoordinator {
         Task {
             await workoutAdapter.stop()
         }
+    }
+
+    /// Begins a raw-set capture (PRC-2 / ADR 0008) for the set about to be
+    /// armed, and installs `viewModel.onCaptureMarker` so the VM's lifecycle
+    /// boundaries land in the recorder's marker timeline. Call this BEFORE
+    /// `viewModel.arm(armedAt:)` with the SAME `armedAt`: `begin` seeds the
+    /// `armed` boundary at t=0 and starts recording, so the `.settling` marker
+    /// `arm()` emits immediately after is captured. `setIndex`/`setCount`/
+    /// `lift` are sourced from the view model — the identity the phone files
+    /// the capture under (workout → exercise → set) comes from `sessionID`/
+    /// `setID` supplied by the caller.
+    func beginCapture(
+        viewModel: LiveSetViewModel,
+        sessionID: UUID,
+        setID: UUID,
+        armedAt: Date
+    ) {
+        captureRecorder.begin(
+            sessionID: sessionID,
+            setID: setID,
+            setIndex: viewModel.setIndex,
+            setCount: viewModel.setCount,
+            lift: viewModel.lift,
+            armedAt: armedAt
+        )
+        viewModel.onCaptureMarker = { [weak self] kind, secondsSinceArm in
+            self?.captureRecorder.mark(kind, at: secondsSinceArm)
+        }
+    }
+
+    /// Seals the in-progress capture at the set-end boundary and hands it back
+    /// for file transfer. Returns `nil` when no capture was recording (e.g.
+    /// the set was never armed, or it was already finished by an earlier
+    /// set-end path), so the caller can `guard let` before transferring.
+    func finishCapture() -> RawSetCapture? {
+        captureRecorder.finish()
     }
 }
 

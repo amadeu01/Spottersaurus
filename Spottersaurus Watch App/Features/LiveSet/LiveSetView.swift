@@ -35,6 +35,10 @@ struct LiveSetView: View {
     /// lifetime.
     let setIndex: Int
     let setCount: Int
+    /// This set's stable id (from the planned set), used as the raw-set
+    /// capture's `setID` so the phone can file the capture under the right
+    /// exercise/set (PRC-2 / ADR 0008).
+    let plannedSetID: UUID
     /// The set queued up after this one, if any — shown via
     /// `NextSetPreviewView` during rest so re-arming is a one-tap start.
     /// `nil` on the last set of the day.
@@ -58,6 +62,7 @@ struct LiveSetView: View {
         _crownValue = State(initialValue: plannedSet.weightKg)
         self.setIndex = setIndex
         self.setCount = setCount
+        self.plannedSetID = plannedSet.id
         self.nextSet = nextSet
         self.onSetSessionComplete = onSetSessionComplete
     }
@@ -229,8 +234,22 @@ struct LiveSetView: View {
     }
 
     private func startWorkout() {
+        // One arm instant shared by the capture and the VM's marker clock so
+        // markers line up with the capture's `armed` boundary (PRC-2).
+        let armedAt = Date()
         sessionCoordinator.stop(logger: dependencies.logger)
-        viewModel.arm(logger: dependencies.logger)
+        // Begin the capture BEFORE arming: `beginCapture` seeds the `armed`
+        // boundary and installs the marker sink, so the `.settling` marker
+        // `arm(armedAt:)` emits next is recorded. `sessionID` falls back to
+        // this set's own id when the Watch is running standalone (no planned
+        // session received) — a single-set capture group.
+        sessionCoordinator.beginCapture(
+            viewModel: viewModel,
+            sessionID: sessionStore.plannedSessionID ?? plannedSetID,
+            setID: plannedSetID,
+            armedAt: armedAt
+        )
+        viewModel.arm(armedAt: armedAt, logger: dependencies.logger)
         dependencies.sendLifecycle(
             .armed(
                 lift: viewModel.lift,
@@ -248,8 +267,18 @@ struct LiveSetView: View {
     }
 
     private func sendFinishedSessionIfAvailable() {
-        guard let envelope = viewModel.finishedSessionEnvelope() else { return }
-        dependencies.sendFinishedSession(envelope)
+        if let envelope = viewModel.finishedSessionEnvelope() {
+            dependencies.sendFinishedSession(envelope)
+        }
+        // Fire the raw-set capture file transfer at the same set-end boundary
+        // (PRC-2 / ADR 0008). Independent of the summary envelope above: a set
+        // with zero reps still has a capture worth keeping (the setup phase
+        // that tunes the rep-1 gate). `finishCapture()` returns `nil` on a
+        // second call, so the two set-end paths (rest timer / manual finish)
+        // never double-transfer.
+        if let capture = sessionCoordinator.finishCapture() {
+            dependencies.sendRawSetCapture(capture)
+        }
     }
 
     private func handleLatestCommand() {
@@ -320,6 +349,7 @@ extension LiveSetView {
         _crownValue = State(initialValue: plannedSet.weightKg)
         self.setIndex = setIndex
         self.setCount = setCount
+        self.plannedSetID = plannedSet.id
         self.nextSet = nil
         self.onSetSessionComplete = {}
     }

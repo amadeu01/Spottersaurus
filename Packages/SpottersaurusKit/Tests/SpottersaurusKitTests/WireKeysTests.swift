@@ -20,5 +20,6 @@ struct WireKeysTests {
         #expect(WireKeys.finishedSession == "finishedSession")
         #expect(WireKeys.liveSetLifecycle == "liveSetLifecycle")
         #expect(WireKeys.liveTick == "liveTick")
+        #expect(WireKeys.rawSetCapture == "rawSetCapture")
     }
 }

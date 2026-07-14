@@ -55,6 +55,13 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
     /// above.
     private(set) var cursor: PlannedSessionCursor?
 
+    /// The most recently received `PlannedSessionEnvelope`'s id, or `nil`
+    /// before any session has arrived. Used as the raw-set capture's
+    /// `sessionID` (PRC-2 / ADR 0008) so every set's capture files under one
+    /// stable workout id — unlike `SessionEnvelope`, which mints a fresh id
+    /// per finished set and so can't group a workout's captures together.
+    private(set) var plannedSessionID: UUID?
+
     /// Pure projection of the flags above via the shared `ConnectionStatus`
     /// reducer (see the doc comment on `isReachable` for the watchOS
     /// isPaired/isWatchAppInstalled assumption).
@@ -80,6 +87,7 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
            let envelope = try? decoder.decode(PlannedSessionEnvelope.self, from: data) {
             self.plannedSession = envelope
             self.cursor = PlannedSessionCursor(session: envelope)
+            self.plannedSessionID = envelope.id
         }
 
         if WCSession.isSupported() {
@@ -204,6 +212,60 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         }
     }
 
+    /// Transfers a completed set's raw sensor capture (PRC-2 / ADR 0008) to
+    /// the phone via `WCSession.transferFile` — durable, background, and
+    /// survives app suspension, unlike the live/summary message path. The
+    /// capture is encoded to its compact binary-plist blob, written to a temp
+    /// file keyed by `setID`, and transferred with identity in the metadata so
+    /// the phone (PRC-3) can file it workout → exercise → set before decoding
+    /// the bytes. The temp file is deleted in `session(_:didFinish:error:)`
+    /// once WatchConnectivity has taken ownership of the payload.
+    func transfer(rawSetCapture capture: RawSetCapture) {
+        guard let session else {
+            logger.error(.watchLink, "raw set capture transfer unavailable; no WCSession")
+            return
+        }
+
+        do {
+            let data = try capture.encoded()
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("rawset-\(capture.setID.uuidString).plist")
+            try data.write(to: url, options: .atomic)
+
+            let metadata: [String: Any] = [
+                WireKeys.rawSetCapture: capture.schemaVersion,
+                "sessionID": capture.sessionID.uuidString,
+                "setID": capture.setID.uuidString,
+                "setIndex": capture.setIndex,
+                "setCount": capture.setCount,
+                "lift": capture.lift.rawValue,
+                "armedAt": capture.armedAt
+            ]
+            session.transferFile(url, metadata: metadata)
+            logger.notice(.watchLink, "transferring raw set capture setID=\(capture.setID) bytes=\(data.count) motion=\(capture.motion.count) hr=\(capture.heartRate.count)")
+        } catch {
+            logger.error(.watchLink, "raw set capture encode/write failed: \(error.localizedDescription)")
+        }
+    }
+
+    func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
+        let url = fileTransfer.file.fileURL
+        if let error {
+            logger.warning(.watchLink, "raw set capture file transfer finished with error: \(error.localizedDescription)")
+        } else {
+            logger.notice(.watchLink, "raw set capture file transfer finished; removing temp file")
+        }
+        // WatchConnectivity has copied the payload into its own outbox by the
+        // time this fires, so our temp file is safe to remove regardless of
+        // success/failure (a failed transfer is retried by WC from its copy,
+        // not ours).
+        try? FileManager.default.removeItem(at: url)
+    }
+
     func session(
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
@@ -292,8 +354,10 @@ final class WatchPlannedSessionStore: NSObject, WCSessionDelegate {
         // this is a new day's plan (or an edited Session Override resend),
         // not a resume of wherever the previous one left off.
         let freshCursor = PlannedSessionCursor(session: envelope)
+        let sessionID = envelope.id
         Task { @MainActor in
             self.cursor = freshCursor
+            self.plannedSessionID = sessionID
         }
     }
 

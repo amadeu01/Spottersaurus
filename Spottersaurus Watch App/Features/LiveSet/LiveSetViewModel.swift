@@ -57,6 +57,16 @@ final class LiveSetViewModel {
     private var spotEngine: SpotEngine
     private let targetWarmupReps = 3
 
+    /// Sink for raw-set-capture lifecycle markers (PRC-2 / ADR 0008),
+    /// installed by `WatchLiveSessionCoordinator.beginCapture` while a capture
+    /// is in progress and left as a no-op otherwise (previews, tests, no-phone
+    /// runs). The VM emits `(kind, secondsSinceArm)` at each lifecycle
+    /// boundary via `stepLifecycle` below; the coordinator forwards them into
+    /// the `RawSetCaptureRecorder` so the capture's marker timeline stays in
+    /// lockstep with the state machine without the VM ever importing
+    /// CoreMotion / WatchConnectivity.
+    var onCaptureMarker: (MarkerKind, TimeInterval) -> Void = { _, _ in }
+
     init(
         plannedSet: PlannedSetEnvelope,
         setIndex: Int = 0,
@@ -221,9 +231,13 @@ final class LiveSetViewModel {
         }
     }
 
-    func arm(logger: any AppLogger = LoggerGroup.watch) {
+    /// `armedAt` is injectable so the raw-set capture (PRC-2) and this VM's
+    /// marker clock share one arm instant: `WatchLiveSessionCoordinator`
+    /// begins the capture with the same `armedAt` it passes here, so a marker
+    /// emitted at `secondsSinceArm ≈ 0` lines up with the capture's `armed`
+    /// boundary. Defaults to `Date()` so previews/tests keep calling `arm()`.
+    func arm(armedAt: Date = Date(), logger: any AppLogger = LoggerGroup.watch) {
         logger.notice(.liveSet, "arming set lift=\(lift.rawValue) targetReps=\(targetReps) weightKg=\(weightKg)")
-        lifecycle.arm()
         calibrationState = .ready(currentCalibration)
         restElapsed = 0
         motionSamples = []
@@ -231,8 +245,11 @@ final class LiveSetViewModel {
         repMetrics = []
         spotEvents = []
         spotEventGate.reset()
-        setStartedAt = Date()
+        setStartedAt = armedAt
         processedRepCount = 0
+        // Set `setStartedAt` first: `stepLifecycle` timestamps the resulting
+        // `.settling` marker relative to it.
+        stepLifecycle { lifecycle.arm() }
     }
 
     func startWarmupCalibration(logger: any AppLogger = LoggerGroup.watch) {
@@ -256,7 +273,7 @@ final class LiveSetViewModel {
     }
 
     func completeRep() {
-        lifecycle.repCompleted()
+        stepLifecycle { lifecycle.repCompleted() }
         velocityMS = max(0.18, velocityMS - 0.03)
         heartRate += 3
     }
@@ -264,17 +281,17 @@ final class LiveSetViewModel {
     func rack(logger: any AppLogger = LoggerGroup.watch) {
         logger.notice(.liveSet, "racking set reps=\(repCount)")
         if lifecycle.state == .settling {
-            lifecycle.repCompleted()
+            stepLifecycle { lifecycle.repCompleted() }
         }
-        lifecycle.autoRack()
+        stepLifecycle { lifecycle.autoRack() }
         restElapsed = 0
-        lifecycle.restTick(elapsed: restElapsed)
+        stepLifecycle { lifecycle.restTick(elapsed: restElapsed) }
     }
 
     func finishRest(logger: any AppLogger = LoggerGroup.watch) {
         logger.info(.liveSet, "finishing rest")
         restElapsed = lifecycle.restSeconds
-        lifecycle.restTick(elapsed: restElapsed)
+        stepLifecycle { lifecycle.restTick(elapsed: restElapsed) }
     }
 
     func setTargetReps(_ value: Double) {
@@ -284,7 +301,7 @@ final class LiveSetViewModel {
     func restTick(elapsed: TimeInterval, logger: any AppLogger = LoggerGroup.watch) -> Bool {
         let wasComplete = lifecycle.state == .complete
         restElapsed = elapsed
-        lifecycle.restTick(elapsed: elapsed)
+        stepLifecycle { lifecycle.restTick(elapsed: elapsed) }
         let didComplete = !wasComplete && lifecycle.state == .complete
         if didComplete {
             logger.notice(.liveSet, "rest completed elapsed=\(elapsed)")
@@ -336,7 +353,7 @@ final class LiveSetViewModel {
 
         let analysis = spotEngine.process(deviceMotion: motionSamples, hr: heartRateSamples)
         for rep in analysis.reps where rep.repIndex >= processedRepCount {
-            lifecycle.repCompleted()
+            stepLifecycle { lifecycle.repCompleted() }
             repMetrics.append(
                 RepMetricEnvelope(
                     repIndex: rep.repIndex,
@@ -384,9 +401,9 @@ final class LiveSetViewModel {
     }
 
     func autoRackFromHardware() {
-        lifecycle.autoRack()
+        stepLifecycle { lifecycle.autoRack() }
         restElapsed = 0
-        lifecycle.restTick(elapsed: restElapsed)
+        stepLifecycle { lifecycle.restTick(elapsed: restElapsed) }
     }
 
 #if DEBUG
@@ -414,6 +431,43 @@ final class LiveSetViewModel {
             confidence: confidence,
             reason: reason
         )
+    }
+
+    /// Runs one pure `SetLifecycleController` mutation and emits the matching
+    /// raw-set-capture marker(s) for whatever boundary it crossed (PRC-2). A
+    /// single choke point keeps the capture marker timeline in lockstep with
+    /// the state machine instead of sprinkling `emitCaptureMarker` through
+    /// every call site. Each controller op crosses at most one state edge and
+    /// bumps `repCount` by at most one, so the before/after diff is
+    /// unambiguous: a rep increment to 1 is the rep-1 gate (setup over), any
+    /// later increment is a normal rep. `alertStage`-only changes
+    /// (`handle(spotEvent:)`) are intentionally NOT routed here — they aren't
+    /// lifecycle boundaries.
+    private func stepLifecycle(_ mutate: () -> Void) {
+        let previousState = lifecycle.state
+        let previousRepCount = lifecycle.repCount
+        mutate()
+
+        if lifecycle.repCount > previousRepCount {
+            emitCaptureMarker(lifecycle.repCount == 1 ? .firstRep : .rep)
+        }
+
+        guard lifecycle.state != previousState else { return }
+        switch lifecycle.state {
+        case .settling: emitCaptureMarker(.settling)
+        case .racked: emitCaptureMarker(.racked)
+        case .resting: emitCaptureMarker(.restStarted)
+        case .complete: emitCaptureMarker(.ended)
+        case .idle, .repping: break
+        }
+    }
+
+    /// Emits one capture marker on the seconds-since-arm clock — the same
+    /// origin (`setStartedAt`) the motion/HR streams are aligned to. `nil`
+    /// `setStartedAt` (a stray transition before arm) falls back to 0.
+    private func emitCaptureMarker(_ kind: MarkerKind) {
+        let secondsSinceArm = setStartedAt.map { max(Date().timeIntervalSince($0), 0) } ?? 0
+        onCaptureMarker(kind, secondsSinceArm)
     }
 
     private var currentCalibration: CalibrationValues {

@@ -29,4 +29,12 @@ public enum WireKeys {
     /// contract so any future keyed live-tick path stays pinned to one
     /// string.
     public static let liveTick = "liveTick"
+    /// Marker key on a `RawSetCapture` file's transfer metadata, sent
+    /// Watch -> iPhone via `WCSession.transferFile` (ADR 0008 / PRC-2). Its
+    /// presence identifies the transferred file as a raw sensor capture so the
+    /// iPhone receiver (PRC-3) can file it workout -> exercise -> set. Unlike
+    /// the keys above — which key a message/userInfo/applicationContext
+    /// dictionary payload — this keys the file transfer's `metadata`; the
+    /// capture bytes themselves ride in the file, not the dictionary.
+    public static let rawSetCapture = "rawSetCapture"
 }
