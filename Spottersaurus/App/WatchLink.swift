@@ -232,6 +232,22 @@ final class WatchLink: NSObject, WCSessionDelegate {
         }
     }
 
+    /// Receives a durable file transfer from the Watch. Raw sensor captures
+    /// (ADR 0008 / PRC-2) arrive here — identified by `WireKeys.rawSetCapture`
+    /// in the transfer metadata — and are handed to `RawSetCaptureStore`,
+    /// which files them workout → exercise → set and applies retention (PRC-3).
+    /// WatchConnectivity deletes the inbox file as soon as this returns, so the
+    /// store copies it synchronously.
+    func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        let metadata = file.metadata
+        guard metadata?[WireKeys.rawSetCapture] != nil else {
+            logger.warning(.watchLink, "received file transfer without recognized metadata; ignoring")
+            return
+        }
+        logger.notice(.watchLink, "received raw set capture file transfer")
+        RawSetCaptureStore.shared.receive(fileAt: file.fileURL, metadata: metadata)
+    }
+
     private func receiveFinishedSession(_ data: Data) {
         guard let envelope = try? decoder.decode(SessionEnvelope.self, from: data) else {
             logger.error(.watchLink, "failed decoding finished session")
