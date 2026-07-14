@@ -183,7 +183,7 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### PRC-5 — Debug surface: list / export / replay — **S**
 
-- [ ] **PRC-5** `S` · iPhone · **Captures in the Debug tab.** Goal: list captures
+- [x] **PRC-5** `S` · iPhone · **Captures in the Debug tab.** (2026-07-13) Goal: list captures
   per set, export NDJSON/CSV, re-run the engine and show results — extends
   `Features/Debug`. Done-when: renders; export + replay invoke PRC-1/PRC-4.
 
