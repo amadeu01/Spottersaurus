@@ -86,6 +86,11 @@ struct ProfileView: View {
             } label: {
                 Label("Debug Logs", systemImage: "ladybug")
             }
+            NavigationLink {
+                RawCaptureBrowserView()
+            } label: {
+                Label("Raw Captures", systemImage: "waveform.path.ecg")
+            }
         }
     }
 
