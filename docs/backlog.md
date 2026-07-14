@@ -168,7 +168,7 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### PRC-3 — iPhone receive + store + retention — **M**
 
-- [ ] **PRC-3** `M` · iPhone · **Receive, group workout→exercise→set, prune.**
+- [x] **PRC-3** `M` · iPhone · **Receive, group workout→exercise→set, prune.** (2026-07-13)
   Goal: accept the transferred file, store locally referenced by set id from
   `WorkoutSession`/`CompletedSet`, grouped by workout/exercise/set; keep-last-N
   retention + manual delete. Done-when: files land, are listable per set, prune
