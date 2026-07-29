@@ -30,31 +30,17 @@ final class LiveSetViewModel {
 
     private var lifecycle: SetLifecycleController
     private var calibrationState: LiveSetCalibrationState
-    private var warmupMotionSamples: [DeviceMotionSample] = []
-    private var motionSamples: [DeviceMotionSample] = []
-    private var heartRateSamples: [HRSample] = []
 
-    /// Wall-clock (not set-relative) ingest timestamps, kept only for the
-    /// `LivePipelineTelemetry` readout so a dev/lifter can tell the pipeline
-    /// is actually alive. Decoupled from `motionSamples`/`heartRateSamples`
-    /// (which use a monotonic clock relative to set arm) because staleness
-    /// must be measured against real elapsed time. Trimmed to a small
-    /// trailing buffer — bounded memory, not a full session history.
-    private var motionIngestTimestamps: [TimeInterval] = []
-    private var hrIngestTimestamps: [TimeInterval] = []
-    private let telemetryBufferRetention: TimeInterval = 2
+    /// All sensor-side bookkeeping for this set — rolling motion/HR buffers,
+    /// the `SpotEngine` and its calibration, the spot-event dedup gate, and
+    /// the telemetry arrival times. It hands back only what's *new* on each
+    /// batch; this view model's job is to translate that into lifecycle
+    /// transitions and display state (docs/PLAN.md Phase 2 task 10).
+    private var sensors: LiveSetSensorAggregator
+
     private var repMetrics: [RepMetricEnvelope] = []
     private var spotEvents: [SpotEventEnvelope] = []
-    /// Dedups `SpotEngine`'s per-tick event stream before it reaches
-    /// `lifecycle.handle(...)`: `analysis.events` re-lists every event still
-    /// inside the rolling motion buffer on every batch, not just what's new,
-    /// so without this gate a single `.rackIt` would re-latch the alert right
-    /// after the lifter resolves it (docs/backlog.md P1-1c). Reset on `arm()`
-    /// so a new set's rep 0 isn't silenced by the previous set's history.
-    private var spotEventGate = SpotEventGate()
     private var setStartedAt: Date?
-    private var processedRepCount = 0
-    private var spotEngine: SpotEngine
     private let targetWarmupReps = 3
 
     /// Sink for raw-set-capture lifecycle markers (PRC-2 / ADR 0008),
@@ -87,7 +73,7 @@ final class LiveSetViewModel {
         self.restElapsed = 0
         self.lifecycle = SetLifecycleController(restSeconds: TimeInterval(plannedSet.restSeconds))
         self.calibrationState = .fallback(fallbackCalibration)
-        self.spotEngine = SpotEngine(lift: plannedSet.lift, calibration: fallbackCalibration)
+        self.sensors = LiveSetSensorAggregator(lift: plannedSet.lift, calibration: fallbackCalibration)
     }
 
     var state: SetLifecycleState {
@@ -149,7 +135,7 @@ final class LiveSetViewModel {
     }
 
     var sensorStatusText: String {
-        let samples = motionSamples.count + warmupMotionSamples.count
+        let samples = sensors.bufferedMotionSampleCount
         guard samples > 0 else { return "Motion: waiting" }
         return "Motion: \(samples) samples"
     }
@@ -158,15 +144,10 @@ final class LiveSetViewModel {
     /// auto-detection is running off real samples, not mocked. `sensorRunning`
     /// isn't tracked by this view model (it doesn't own the motion adapter),
     /// so the caller (typically `WatchLiveSessionCoordinator.isMotionRunning`)
-    /// passes it in; samples/sec, HR-flowing, and staleness are derived here
-    /// from recent wall-clock ingest timestamps.
+    /// passes it in; samples/sec, HR-flowing, and staleness come from the
+    /// aggregator's record of recent wall-clock sample arrivals.
     func telemetry(sensorRunning: Bool, now: Date = Date()) -> LivePipelineTelemetry {
-        LivePipelineTelemetry.make(
-            motionSampleTimestamps: motionIngestTimestamps,
-            hrSampleTimestamps: hrIngestTimestamps,
-            now: now.timeIntervalSinceReferenceDate,
-            sensorRunning: sensorRunning
-        )
+        sensors.telemetry(sensorRunning: sensorRunning, now: now.timeIntervalSinceReferenceDate)
     }
 
     var liveTickEnvelope: LiveTickEnvelope {
@@ -240,13 +221,10 @@ final class LiveSetViewModel {
         logger.notice(.liveSet, "arming set lift=\(lift.rawValue) targetReps=\(targetReps) weightKg=\(weightKg)")
         calibrationState = .ready(currentCalibration)
         restElapsed = 0
-        motionSamples = []
-        heartRateSamples = []
         repMetrics = []
         spotEvents = []
-        spotEventGate.reset()
+        sensors.arm()
         setStartedAt = armedAt
-        processedRepCount = 0
         // Set `setStartedAt` first: `stepLifecycle` timestamps the resulting
         // `.settling` marker relative to it.
         stepLifecycle { lifecycle.arm() }
@@ -254,7 +232,7 @@ final class LiveSetViewModel {
 
     func startWarmupCalibration(logger: any AppLogger = LoggerGroup.watch) {
         logger.notice(.calibration, "starting warmup calibration lift=\(lift.rawValue)")
-        warmupMotionSamples = []
+        sensors.beginWarmupCalibration()
         calibrationState = .collecting(candidate: nil)
     }
 
@@ -263,13 +241,13 @@ final class LiveSetViewModel {
         guard values.repCount > 0 else {
             logger.warning(.calibration, "warmup calibration had no clean reps; using fallback lift=\(lift.rawValue)")
             calibrationState = .fallback(CalibrationValues.fallback(for: lift))
-            spotEngine = SpotEngine(lift: lift, calibration: currentCalibration)
+            sensors.applyCalibration(currentCalibration)
             return
         }
 
         logger.notice(.calibration, "saved calibration lift=\(lift.rawValue) reps=\(values.repCount) tempo=\(values.baselineConcentricSeconds) lower=\(values.velocityBandLowerMS) upper=\(values.velocityBandUpperMS)")
         calibrationState = .ready(values)
-        spotEngine = SpotEngine(lift: lift, calibration: values)
+        sensors.applyCalibration(values)
     }
 
     func completeRep() {
@@ -337,22 +315,18 @@ final class LiveSetViewModel {
     }
 
     func ingestMotionSamples(_ samples: [DeviceMotionSample]) {
-        recordMotionIngestTelemetry(count: samples.count)
+        let result = sensors.ingestMotion(
+            samples,
+            routing: motionRouting,
+            at: Date().timeIntervalSinceReferenceDate
+        )
 
-        if calibrationState.isCollecting {
-            warmupMotionSamples.append(contentsOf: samples)
-            trimWarmupSamples()
-            let candidate = Calibration().calibrate(lift: lift, warmupDeviceMotion: warmupMotionSamples)
+        if let candidate = result.calibrationCandidate {
             calibrationState = .collecting(candidate: candidate)
             return
         }
 
-        guard lifecycle.state == .settling || lifecycle.state == .repping else { return }
-        motionSamples.append(contentsOf: samples)
-        trimSamples()
-
-        let analysis = spotEngine.process(deviceMotion: motionSamples, hr: heartRateSamples)
-        for rep in analysis.reps where rep.repIndex >= processedRepCount {
+        for rep in result.newReps {
             stepLifecycle { lifecycle.repCompleted() }
             repMetrics.append(
                 RepMetricEnvelope(
@@ -364,14 +338,10 @@ final class LiveSetViewModel {
                     flaggedStall: rep.flaggedStall
                 )
             )
-            processedRepCount = rep.repIndex + 1
             velocityMS = max(0, rep.meanVelocityMS)
         }
-        // `analysis.events` re-lists every event still inside the rolling
-        // motion buffer on every tick, not just what's new since last time —
-        // gate it so a replayed `.rackIt` never re-latches an alert the
-        // lifter already resolved (docs/backlog.md P1-1c).
-        for event in spotEventGate.admitNew(from: analysis.events) {
+
+        for event in result.newEvents {
             let envelope = SpotEventEnvelope(
                 stage: event.kind,
                 timestamp: event.timestamp,
@@ -386,11 +356,22 @@ final class LiveSetViewModel {
         }
     }
 
+    /// Where an arriving motion batch belongs, which is a question only this
+    /// view model can answer: warmup capture wins if it's running, otherwise
+    /// samples only feed detection while a set is actually in flight. Anything
+    /// else (idle, racked, resting, complete) is still counted as proof the
+    /// sensor is alive, but must not produce reps.
+    private var motionRouting: LiveSetSensorAggregator.MotionRouting {
+        if calibrationState.isCollecting { return .warmupCalibration }
+        switch lifecycle.state {
+        case .settling, .repping: return .workingSet
+        case .idle, .racked, .resting, .complete: return .telemetryOnly
+        }
+    }
+
     func ingestHeartRate(_ sample: HRSample) {
-        heartRateSamples.append(sample)
+        sensors.ingestHeartRate(sample, at: Date().timeIntervalSinceReferenceDate)
         heartRate = Int(sample.beatsPerMinute.rounded())
-        trimSamples()
-        recordHRIngestTelemetry()
     }
 
     /// Re-queries the HealthKit heart-rate authorization status so the UI can
@@ -479,34 +460,4 @@ final class LiveSetViewModel {
         }
     }
 
-    private func trimSamples() {
-        let motionFloor = (motionSamples.last?.timestamp ?? 0) - 30
-        motionSamples.removeAll { $0.timestamp < motionFloor }
-
-        let hrFloor = (heartRateSamples.last?.timestamp ?? 0) - 60
-        heartRateSamples.removeAll { $0.timestamp < hrFloor }
-    }
-
-    private func trimWarmupSamples() {
-        let floor = (warmupMotionSamples.last?.timestamp ?? 0) - 45
-        warmupMotionSamples.removeAll { $0.timestamp < floor }
-    }
-
-    private func recordMotionIngestTelemetry(count: Int) {
-        guard count > 0 else { return }
-        let now = Date().timeIntervalSinceReferenceDate
-        motionIngestTimestamps.append(contentsOf: Array(repeating: now, count: count))
-        trimTelemetryTimestamps()
-    }
-
-    private func recordHRIngestTelemetry() {
-        hrIngestTimestamps.append(Date().timeIntervalSinceReferenceDate)
-        trimTelemetryTimestamps()
-    }
-
-    private func trimTelemetryTimestamps() {
-        let floor = Date().timeIntervalSinceReferenceDate - telemetryBufferRetention
-        motionIngestTimestamps.removeAll { $0 < floor }
-        hrIngestTimestamps.removeAll { $0 < floor }
-    }
 }

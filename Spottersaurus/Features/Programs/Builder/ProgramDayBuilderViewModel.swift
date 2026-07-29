@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 struct ProgramDayBuilderViewModel {
     func addSet(to day: inout ProgramDayDraft) {
