@@ -92,4 +92,17 @@ public struct SessionOverride: Sendable, Equatable {
         }
         return adjusted
     }
+
+    /// `true` if any RPE-originated set in `base`
+    /// (`PlannedSetEnvelope.requiresWeightInput`) has not had an explicit
+    /// weight entered via this override yet. Non-RPE sets never contribute
+    /// here, regardless of whether they have a weight override — only
+    /// `requiresWeightInput` sets need one before Send is allowed. Pure:
+    /// reads only `base` and `self`.
+    public func hasUnfilledRequiredWeights(in base: PlannedSessionEnvelope) -> Bool {
+        base.sets.contains { set in
+            guard set.requiresWeightInput else { return false }
+            return setOverrides[set.id]?.weightKg == nil
+        }
+    }
 }
