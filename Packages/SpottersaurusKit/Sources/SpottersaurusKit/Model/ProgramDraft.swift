@@ -22,17 +22,26 @@ public struct ProgramDraft: Identifiable {
     public var days: [ProgramDayDraft] = [
         ProgramDayDraft(name: "Day 1"),
     ]
+    /// Optional mesocycle label, mirroring `Program.mesocycleNumber`. `nil`
+    /// unless explicitly set (e.g. by a future paste-import parser).
+    public var mesocycleNumber: Int? = nil
+    /// Optional week-within-mesocycle label, mirroring `Program.weekNumber`.
+    public var weekNumber: Int? = nil
 
     public init(
         id: UUID = UUID(),
         name: String = "Custom Program",
         rule: ProgressionRule = .custom,
-        days: [ProgramDayDraft] = [ProgramDayDraft(name: "Day 1")]
+        days: [ProgramDayDraft] = [ProgramDayDraft(name: "Day 1")],
+        mesocycleNumber: Int? = nil,
+        weekNumber: Int? = nil
     ) {
         self.id = id
         self.name = name
         self.rule = rule
         self.days = days
+        self.mesocycleNumber = mesocycleNumber
+        self.weekNumber = weekNumber
     }
 
     /// Trims the name and normalizes each day (falling back to "Day N" for
@@ -50,7 +59,12 @@ public struct ProgramDraft: Identifiable {
     /// `PlannedSet` objects) from this draft. Days with no sets are skipped.
     public func makeProgram() -> Program {
         let normalized = normalized()
-        let program = Program(name: normalized.name, rule: normalized.rule)
+        let program = Program(
+            name: normalized.name,
+            rule: normalized.rule,
+            mesocycleNumber: normalized.mesocycleNumber,
+            weekNumber: normalized.weekNumber
+        )
         for (dayIndex, dayDraft) in normalized.days.enumerated() where !dayDraft.sets.isEmpty {
             let day = ProgramDay(name: dayDraft.name, sortIndex: dayIndex)
             for (setIndex, setDraft) in dayDraft.sets.enumerated() {
@@ -61,6 +75,7 @@ public struct ProgramDraft: Identifiable {
                     load: setDraft.load.prescription,
                     isAMRAP: setDraft.isAMRAP,
                     restSeconds: setDraft.restSeconds,
+                    filmReminder: setDraft.filmReminder,
                     sortIndex: setIndex
                 )
                 day.appendPlannedSet(set)
@@ -104,6 +119,9 @@ public struct PlannedSetDraft: Identifiable {
     public var load = PlannedSetLoadDraft(kind: .absolute, value: 100)
     public var isAMRAP = false
     public var restSeconds = 180
+    /// Manual "remember to film this set" reminder, mirroring
+    /// `PlannedSet.filmReminder`.
+    public var filmReminder = false
 
     public init(
         id: UUID = UUID(),
@@ -112,7 +130,8 @@ public struct PlannedSetDraft: Identifiable {
         targetReps: Int = 5,
         load: PlannedSetLoadDraft = PlannedSetLoadDraft(kind: .absolute, value: 100),
         isAMRAP: Bool = false,
-        restSeconds: Int = 180
+        restSeconds: Int = 180,
+        filmReminder: Bool = false
     ) {
         self.id = id
         self.lift = lift
@@ -121,6 +140,7 @@ public struct PlannedSetDraft: Identifiable {
         self.load = load
         self.isAMRAP = isAMRAP
         self.restSeconds = restSeconds
+        self.filmReminder = filmReminder
     }
 
     /// The exercise name to store: the custom name for accessory work when
@@ -151,6 +171,7 @@ public struct PlannedSetLoadDraft: Equatable {
     public enum Kind: String, CaseIterable, Identifiable {
         case absolute
         case percentOfTrainingMax
+        case rpe
 
         public var id: String { rawValue }
     }
@@ -170,16 +191,21 @@ public struct PlannedSetLoadDraft: Equatable {
             return .absolute(kg: value)
         case .percentOfTrainingMax:
             return .percentOfTrainingMax(percent: value)
+        case .rpe:
+            return .rpe(rpe: value)
         }
     }
 
-    /// A short human-readable summary, e.g. "100.0 kg" or "85% training max".
+    /// A short human-readable summary, e.g. "100.0 kg", "85% training max",
+    /// or "RPE 9".
     public var summary: String {
         switch kind {
         case .absolute:
             return "\(value.formatted(.number.precision(.fractionLength(0...1)))) kg"
         case .percentOfTrainingMax:
             return "\(Int(value))% training max"
+        case .rpe:
+            return "RPE \(value.formatted(.number.precision(.fractionLength(0...1))))"
         }
     }
 }
