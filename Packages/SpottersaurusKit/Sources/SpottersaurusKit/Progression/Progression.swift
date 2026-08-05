@@ -47,7 +47,12 @@ public enum Progression: Sendable {
     /// `increment`. `.absolute` loads are rounded as-is; `.percentOfTrainingMax`
     /// loads scale the training max looked up from `maxes` for the set's
     /// exercise's `LiftKind` (falling back to `0` if the lifter has not set
-    /// one yet, matching `Program`'s preset builders).
+    /// one yet, matching `Program`'s preset builders). `.rpe` loads have no
+    /// derivable weight (`PlannedSet.resolvedWeightKg` returns `nil`) — this
+    /// falls back to `0` rather than crashing, the same as the "no training
+    /// max set" fallback above; a real number for an RPE set is filled in at
+    /// send-time via the Session Override editor (a later ticket), not
+    /// derived here.
     public static func resolvedWeightKg(
         for plannedSet: PlannedSet,
         maxes: [UserMaxes],
@@ -56,6 +61,7 @@ public enum Progression: Sendable {
         let trainingMaxKg = plannedSet.exercise.flatMap { exercise in
             maxes.first { $0.lift == exercise.kind }
         }?.trainingMaxKg ?? 0
-        return round(plannedSet.resolvedWeightKg(trainingMaxKg: trainingMaxKg), to: increment)
+        let resolvedKg = plannedSet.resolvedWeightKg(trainingMaxKg: trainingMaxKg) ?? 0
+        return round(resolvedKg, to: increment)
     }
 }

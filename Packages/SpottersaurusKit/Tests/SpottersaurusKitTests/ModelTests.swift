@@ -135,7 +135,7 @@ final class ModelTests: XCTestCase {
         ]
     }
 
-    func testFiveThreeOnePresetStructure() {
+    func testFiveThreeOnePresetStructure() throws {
         let program = Program.fiveThreeOne(maxes: sampleMaxes())
         XCTAssertEqual(program.rule, .fivethreeone)
         XCTAssertEqual(program.orderedDays.count, 3)
@@ -156,7 +156,8 @@ final class ModelTests: XCTestCase {
 
         // Percentage loads resolve against the lift's training max.
         let squatTopSet = program.orderedDays[0].orderedSets[2]
-        XCTAssertEqual(squatTopSet.resolvedWeightKg(trainingMaxKg: 180), 153, accuracy: 0.0001) // 85% of 180
+        let resolved = try XCTUnwrap(squatTopSet.resolvedWeightKg(trainingMaxKg: 180))
+        XCTAssertEqual(resolved, 153, accuracy: 0.0001) // 85% of 180
     }
 
     func testLinearProgressionPresetStructure() {
@@ -180,5 +181,66 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(Program.roundToPlate(108), 107.5, accuracy: 0.0001)   // 43.2 → 43
         XCTAssertEqual(Program.roundToPlate(106.24), 105, accuracy: 0.0001)  // 42.496 → 42
         XCTAssertEqual(Program.roundToPlate(106.26), 107.5, accuracy: 0.0001) // 42.504 → 43
+    }
+
+    // MARK: LoadPrescription.resolvedKg
+
+    func testResolvedKgForAbsoluteLoadIgnoresTrainingMax() {
+        let load = LoadPrescription.absolute(kg: 100)
+        XCTAssertEqual(load.resolvedKg(trainingMaxKg: 180), 100)
+    }
+
+    func testResolvedKgForPercentOfTrainingMaxScalesTheMax() throws {
+        let load = LoadPrescription.percentOfTrainingMax(percent: 85)
+        let resolved = try XCTUnwrap(load.resolvedKg(trainingMaxKg: 180))
+        XCTAssertEqual(resolved, 153, accuracy: 0.0001)
+    }
+
+    func testResolvedKgForRPEIsNilThereIsNoDerivableWeight() {
+        let load = LoadPrescription.rpe(rpe: 9)
+        XCTAssertNil(load.resolvedKg(trainingMaxKg: 180))
+    }
+
+    func testPlannedSetResolvedWeightKgForRPESetIsNil() {
+        let set = PlannedSet(exercise: nil, targetReps: 12, load: .rpe(rpe: 9))
+        XCTAssertNil(set.resolvedWeightKg(trainingMaxKg: 180))
+    }
+
+    // MARK: PlannedSet.filmReminder
+
+    func testPlannedSetFilmReminderDefaultsToFalse() {
+        let set = PlannedSet(exercise: nil, targetReps: 5, load: .absolute(kg: 100))
+        XCTAssertFalse(set.filmReminder)
+    }
+
+    func testPlannedSetFilmReminderCanBeSetTrue() {
+        let set = PlannedSet(exercise: nil, targetReps: 5, load: .absolute(kg: 100), filmReminder: true)
+        XCTAssertTrue(set.filmReminder)
+    }
+
+    // MARK: Program.mesocycleNumber / weekNumber
+
+    func testProgramMesocycleAndWeekNumberDefaultToNil() {
+        let program = Program(name: "Custom", rule: .custom)
+        XCTAssertNil(program.mesocycleNumber)
+        XCTAssertNil(program.weekNumber)
+    }
+
+    func testProgramMesocycleAndWeekNumberCanBeSetExplicitly() {
+        let program = Program(name: "Imported", rule: .custom, mesocycleNumber: 2, weekNumber: 6)
+        XCTAssertEqual(program.mesocycleNumber, 2)
+        XCTAssertEqual(program.weekNumber, 6)
+    }
+
+    func testFiveThreeOnePresetHasNilMesocycleAndWeekNumber() throws {
+        let program = Program.fiveThreeOne(maxes: sampleMaxes())
+        XCTAssertNil(program.mesocycleNumber)
+        XCTAssertNil(program.weekNumber)
+    }
+
+    func testLinearProgressionPresetHasNilMesocycleAndWeekNumber() throws {
+        let program = Program.linearProgression(maxes: sampleMaxes())
+        XCTAssertNil(program.mesocycleNumber)
+        XCTAssertNil(program.weekNumber)
     }
 }

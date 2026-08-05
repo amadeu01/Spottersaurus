@@ -64,6 +64,18 @@ struct ProgressionTests {
         #expect(weight == 77.5)
     }
 
+    // An RPE-prescribed set has no derivable weight (`LoadPrescription.resolvedKg`
+    // returns `nil`) — `Progression.resolvedWeightKg(for:maxes:)` falls back to
+    // 0 kg rather than crashing, matching the existing "no training max set
+    // yet" fallback, pending the send-time Session Override input this
+    // resolves to in a later ticket.
+    @Test func resolvesPlannedSetRPELoadToZeroPendingSendTimeOverride() {
+        let accessory = Exercise(name: "Leg Extension", kind: .accessory)
+        let set = PlannedSet(exercise: accessory, targetReps: 12, load: .rpe(rpe: 9))
+        let weight = Progression.resolvedWeightKg(for: set, maxes: [])
+        #expect(weight == 0)
+    }
+
     // MARK: - 5/3/1 training max
 
     @Test func trainingMaxIs90PercentOf1RMRounded() {
