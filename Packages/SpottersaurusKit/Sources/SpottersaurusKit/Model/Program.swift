@@ -43,6 +43,13 @@ public final class Program {
     /// Progression rule; persisted by raw value.
     public var rule: ProgressionRule = ProgressionRule.custom
     public var createdAt: Date = Date()
+    /// Optional mesocycle label for a program pasted/imported from a
+    /// coach-authored block (e.g. "Mesociclo 2"). `nil` for programs not
+    /// created via import, including the 5/3/1 and Linear presets.
+    public var mesocycleNumber: Int? = nil
+    /// Optional week-within-mesocycle label (e.g. "Semana 6"), paired with
+    /// `mesocycleNumber`. `nil` for programs not created via import.
+    public var weekNumber: Int? = nil
 
     /// The program's days. Cascade delete: removing the program removes its
     /// days (and, transitively, their planned sets). Read `orderedDays`.
@@ -54,11 +61,20 @@ public final class Program {
     @Relationship(deleteRule: .nullify, inverse: \WorkoutSession.program)
     public var sessions: [WorkoutSession]?
 
-    public init(name: String, rule: ProgressionRule, id: UUID = UUID(), createdAt: Date = Date()) {
+    public init(
+        name: String,
+        rule: ProgressionRule,
+        id: UUID = UUID(),
+        createdAt: Date = Date(),
+        mesocycleNumber: Int? = nil,
+        weekNumber: Int? = nil
+    ) {
         self.id = id
         self.name = name
         self.rule = rule
         self.createdAt = createdAt
+        self.mesocycleNumber = mesocycleNumber
+        self.weekNumber = weekNumber
     }
 
     /// Days sorted by their explicit order index.

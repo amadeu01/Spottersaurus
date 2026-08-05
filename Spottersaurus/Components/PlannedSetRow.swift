@@ -39,12 +39,17 @@ struct PlannedSetRow: View {
     }
 
     private var loadText: String {
-        let kg = Progression.resolvedWeightKg(for: set, maxes: maxes)
         switch set.load {
         case .absolute:
+            let kg = Progression.resolvedWeightKg(for: set, maxes: maxes)
             return "\(kg.formatted(.number.precision(.fractionLength(0...1)))) kg"
         case .percentOfTrainingMax(let percent):
+            let kg = Progression.resolvedWeightKg(for: set, maxes: maxes)
             return "\(Int(percent))% · \(kg.formatted(.number.precision(.fractionLength(0...1)))) kg"
+        case .rpe(let rpe):
+            // No derivable weight — the lifter picks it in the moment; the
+            // actual number is filled in at send-time (later ticket).
+            return "RPE \(rpe.formatted(.number.precision(.fractionLength(0...1))))"
         }
     }
 }
