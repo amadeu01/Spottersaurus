@@ -46,6 +46,15 @@ struct SessionOverrideEditorView: View {
         override.apply(to: baseEnvelope)
     }
 
+    /// `false` while any RPE-originated set in today's day (`PlannedSetEnvelope
+    /// .requiresWeightInput`) still has no weight entered — "Send to Watch"
+    /// stays disabled until every one of them is filled in. Non-RPE sets are
+    /// never gated. See the "RPE weight resolution at send-time"
+    /// Implementation Decision in `docs/specs/2026-08-05-custom-program-import.md`.
+    private var canSend: Bool {
+        !override.hasUnfilledRequiredWeights(in: baseEnvelope)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -79,11 +88,15 @@ struct SessionOverrideEditorView: View {
                         Text(sendStatus.rawValue)
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(.secondary)
+                    } else if !canSend {
+                        Text("Enter a weight for every RPE set before sending.")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(Theme.Colors.brandOrange)
                     }
                     PrimaryButton("Send to Watch", systemImage: "applewatch", tint: Theme.Colors.brandOrange) {
                         Task { await send() }
                     }
-                    .disabled(isSending)
+                    .disabled(isSending || !canSend)
                 }
                 .padding(Theme.Spacing.md)
                 .background(.ultraThinMaterial)
@@ -130,6 +143,24 @@ private struct SessionOverrideSetCard: View {
         Binding(get: { override.weightKg ?? set.weightKg }, set: { override.weightKg = $0 })
     }
 
+    /// Text-field binding for an RPE-originated set's weight: unlike
+    /// `weightBinding`, this never falls back to `set.weightKg` (that's just
+    /// the `0` placeholder `Progression.resolvedWeightKg` uses for RPE loads —
+    /// see `PlannedSetEnvelope.requiresWeightInput`) — the field starts truly
+    /// empty and only reflects a value once the lifter types one in.
+    private var rpeWeightTextBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let weightKg = override.weightKg else { return "" }
+                return weightKg.formatted(.number.precision(.fractionLength(0...2)))
+            },
+            set: { newValue in
+                let normalized = newValue.replacingOccurrences(of: ",", with: ".")
+                override.weightKg = Double(normalized)
+            }
+        )
+    }
+
     private var restBinding: Binding<Int> {
         Binding(get: { override.restSeconds ?? set.restSeconds }, set: { override.restSeconds = $0 })
     }
@@ -162,18 +193,40 @@ private struct SessionOverrideSetCard: View {
                 .font(.system(.body, design: .rounded, weight: .semibold))
                 .frame(minHeight: 44)
 
-                Stepper(value: weightBinding, in: 0...500, step: 2.5) {
+                if set.requiresWeightInput {
+                    // RPE-prescribed set: no derivable weight to prefill (see
+                    // `PlannedSetEnvelope.requiresWeightInput`) — the field
+                    // starts empty and "Send to Watch" stays disabled until
+                    // it's filled in.
                     HStack {
                         Text("Weight")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(weightBinding.wrappedValue.formatted(.number.precision(.fractionLength(0...1)))) kg")
+                        TextField("Enter weight", text: rpeWeightTextBinding)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
                             .monospacedDigit()
                             .foregroundStyle(Theme.Colors.brandOrange)
+                            .frame(minWidth: 80)
+                        Text("kg")
+                            .foregroundStyle(.secondary)
                     }
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .frame(minHeight: 44)
+                } else {
+                    Stepper(value: weightBinding, in: 0...500, step: 2.5) {
+                        HStack {
+                            Text("Weight")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(weightBinding.wrappedValue.formatted(.number.precision(.fractionLength(0...1)))) kg")
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.Colors.brandOrange)
+                        }
+                    }
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .frame(minHeight: 44)
                 }
-                .font(.system(.body, design: .rounded, weight: .semibold))
-                .frame(minHeight: 44)
 
                 Stepper(value: restBinding, in: 0...600, step: 15) {
                     HStack {
@@ -200,4 +253,25 @@ private struct SessionOverrideSetCard: View {
     let program = PreviewSeed.program(maxes: maxes)
 
     return SessionOverrideEditorView(program: program, day: program.orderedDays[0], maxes: maxes)
+}
+
+/// A day mixing a fixed-load main lift with RPE-prescribed accessory work —
+/// covers Issue #6: the RPE set's weight field starts empty (no prefilled
+/// value) while the fixed-load set still prefills as normal, and "Send to
+/// Watch" starts disabled until the RPE set's weight is entered.
+#Preview("RPE mix — weight required before Send") {
+    let bench = Exercise(name: "Bench Press", kind: .bench)
+    let flye = Exercise(name: "Cable Fly", kind: .accessory)
+    let extension_ = Exercise(name: "Triceps Pulley", kind: .accessory)
+
+    let program = Program(name: "Coach Block", rule: .custom, mesocycleNumber: 2, weekNumber: 6)
+    let day = ProgramDay(name: "Dia 2 — Peito")
+    day.plannedSets = [
+        PlannedSet(exercise: bench, targetReps: 5, load: .absolute(kg: 100), restSeconds: 180, sortIndex: 0),
+        PlannedSet(exercise: flye, targetReps: 12, load: .rpe(rpe: 9), restSeconds: 90, sortIndex: 1),
+        PlannedSet(exercise: extension_, targetReps: 12, load: .rpe(rpe: 8), restSeconds: 60, sortIndex: 2),
+    ]
+    program.days = [day]
+
+    return SessionOverrideEditorView(program: program, day: day, maxes: [])
 }

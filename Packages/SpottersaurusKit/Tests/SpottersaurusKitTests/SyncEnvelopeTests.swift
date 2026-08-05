@@ -334,6 +334,69 @@ final class SyncEnvelopeTests: XCTestCase {
         XCTAssertEqual(envelope.sets.map { $0.exerciseName }, ["Bench Press", "Barbell Row"])
         XCTAssertEqual(envelope.sets.map { $0.weightKg }, [80, 62.5])
         XCTAssertEqual(envelope.firstSet?.isAMRAP, true)
+        XCTAssertEqual(envelope.sets.map { $0.requiresWeightInput }, [false, false])
+    }
+
+    /// A `PlannedSet` with an RPE-prescribed load has no derivable weight
+    /// (`Progression.resolvedWeightKg` falls back to `0`) — the factory must
+    /// flag it via `requiresWeightInput` so the Session Override editor knows
+    /// that `0` is a placeholder, not a real prescription. See the "RPE
+    /// weight resolution at send-time" Implementation Decision in
+    /// `docs/specs/2026-08-05-custom-program-import.md`.
+    func testPlannedSessionEnvelopeFactoryFlagsRPESetsAsRequiringWeightInput() {
+        let bench = Exercise(name: "Bench Press", kind: .bench)
+        let accessory = Exercise(name: "Cable Fly", kind: .accessory)
+        let program = Program(name: "Upper", rule: .custom)
+        let day = ProgramDay(name: "Day 1")
+        let fixedSet = PlannedSet(exercise: bench, targetReps: 5, load: .absolute(kg: 80), restSeconds: 180, sortIndex: 0)
+        let rpeSet = PlannedSet(exercise: accessory, targetReps: 12, load: .rpe(rpe: 9), restSeconds: 90, sortIndex: 1)
+        day.plannedSets = [fixedSet, rpeSet]
+        program.days = [day]
+
+        let envelope = PlannedSessionEnvelope.make(program: program, day: day, maxes: [])
+
+        XCTAssertEqual(envelope.sets.map { $0.requiresWeightInput }, [false, true])
+        XCTAssertEqual(envelope.sets[1].weightKg, 0, "no derivable weight for an RPE set — 0 is a placeholder, flagged by requiresWeightInput")
+    }
+
+    /// The pre-existing scaffold init (no `requiresWeightInput`) must keep
+    /// compiling untouched and default to `false` — additive, not a breaking
+    /// signature change.
+    func testPlannedSetEnvelopeOldInitDefaultsRequiresWeightInputToFalse() {
+        let legacy = PlannedSetEnvelope(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 80)
+        XCTAssertEqual(legacy.requiresWeightInput, false)
+    }
+
+    func testPlannedSetEnvelopeRoundTripsWithRequiresWeightInput() throws {
+        let set = PlannedSetEnvelope(lift: .accessory, exerciseName: "Cable Fly", targetReps: 12, weightKg: 0, requiresWeightInput: true)
+
+        let decoded = try roundTrip(set)
+
+        XCTAssertEqual(decoded, set)
+        XCTAssertEqual(decoded.requiresWeightInput, true)
+    }
+
+    /// Older Watch app builds shipped `PlannedSetEnvelope` JSON without a
+    /// `requiresWeightInput` key at all — decoding that payload must not
+    /// throw, and the field must default to `false`.
+    func testPlannedSetEnvelopeDecodesOlderJSONWithoutRequiresWeightInput() throws {
+        let json = """
+        {
+            "id": "\(UUID().uuidString)",
+            "lift": "bench",
+            "exerciseName": "Bench Press",
+            "targetReps": 5,
+            "weightKg": 80,
+            "isAMRAP": false,
+            "restSeconds": 180,
+            "sortIndex": 0
+        }
+        """
+        let (_, decoder) = makeCoders()
+        let decoded = try decoder.decode(PlannedSetEnvelope.self, from: Data(json.utf8))
+
+        XCTAssertEqual(decoded.requiresWeightInput, false)
+        XCTAssertEqual(decoded.exerciseName, "Bench Press")
     }
 
     // MARK: CompletedSetEnvelope — richer fields

@@ -312,6 +312,15 @@ public struct PlannedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
     public var isAMRAP: Bool
     public var restSeconds: Int
     public var sortIndex: Int
+    /// `true` when this set's underlying `PlannedSet.load` was RPE-prescribed
+    /// (`LoadPrescription.rpe`), which has no derivable weight —
+    /// `weightKg` is a `0` placeholder in that case, not a real prescription.
+    /// The Session Override editor uses this flag to leave the weight field
+    /// empty (rather than prefilled) and to gate "Send to Watch" until the
+    /// lifter enters a real number. See the "RPE weight resolution at
+    /// send-time" Implementation Decision in
+    /// `docs/specs/2026-08-05-custom-program-import.md`.
+    public var requiresWeightInput: Bool
 
     public init(
         id: UUID = UUID(),
@@ -321,7 +330,8 @@ public struct PlannedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
         weightKg: Double,
         isAMRAP: Bool = false,
         restSeconds: Int = 180,
-        sortIndex: Int = 0
+        sortIndex: Int = 0,
+        requiresWeightInput: Bool = false
     ) {
         self.id = id
         self.lift = lift
@@ -331,6 +341,29 @@ public struct PlannedSetEnvelope: Codable, Sendable, Equatable, Identifiable {
         self.isAMRAP = isAMRAP
         self.restSeconds = restSeconds
         self.sortIndex = sortIndex
+        self.requiresWeightInput = requiresWeightInput
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, lift, exerciseName, targetReps, weightKg, isAMRAP, restSeconds, sortIndex
+        case requiresWeightInput
+    }
+
+    /// Hand-written so older wire payloads (Watch app builds predating this
+    /// field) still decode cleanly — `requiresWeightInput` defaults to
+    /// `false` when the key is absent, rather than failing the whole
+    /// envelope (mirrors `CompletedSetEnvelope.manualResolveCount`).
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        lift = try container.decode(LiftKind.self, forKey: .lift)
+        exerciseName = try container.decode(String.self, forKey: .exerciseName)
+        targetReps = try container.decode(Int.self, forKey: .targetReps)
+        weightKg = try container.decode(Double.self, forKey: .weightKg)
+        isAMRAP = try container.decode(Bool.self, forKey: .isAMRAP)
+        restSeconds = try container.decode(Int.self, forKey: .restSeconds)
+        sortIndex = try container.decode(Int.self, forKey: .sortIndex)
+        requiresWeightInput = try container.decodeIfPresent(Bool.self, forKey: .requiresWeightInput) ?? false
     }
 }
 
@@ -373,6 +406,12 @@ public struct PlannedSessionEnvelope: Codable, Sendable, Equatable, Identifiable
             createdAt: createdAt,
             sets: day.orderedSets.map { plannedSet in
                 let exercise = plannedSet.exercise
+                let isRPE: Bool
+                if case .rpe = plannedSet.load {
+                    isRPE = true
+                } else {
+                    isRPE = false
+                }
                 return PlannedSetEnvelope(
                     id: plannedSet.id,
                     lift: exercise?.kind ?? .accessory,
@@ -381,7 +420,8 @@ public struct PlannedSessionEnvelope: Codable, Sendable, Equatable, Identifiable
                     weightKg: Progression.resolvedWeightKg(for: plannedSet, maxes: maxes),
                     isAMRAP: plannedSet.isAMRAP,
                     restSeconds: plannedSet.restSeconds,
-                    sortIndex: plannedSet.sortIndex
+                    sortIndex: plannedSet.sortIndex,
+                    requiresWeightInput: isRPE
                 )
             }
         )

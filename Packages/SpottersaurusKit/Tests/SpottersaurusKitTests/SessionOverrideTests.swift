@@ -195,6 +195,88 @@ final class SessionOverrideTests: XCTestCase {
         XCTAssertEqual(adjusted, base)
     }
 
+    // MARK: hasUnfilledRequiredWeights — RPE weight-input gate
+
+    private func makeBaseWithRPESet() -> PlannedSessionEnvelope {
+        PlannedSessionEnvelope(
+            programName: "Coach Block",
+            dayName: "Day 1",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            sets: [
+                PlannedSetEnvelope(lift: .bench, exerciseName: "Bench Press", targetReps: 5, weightKg: 80, restSeconds: 180, sortIndex: 0),
+                PlannedSetEnvelope(lift: .accessory, exerciseName: "Cable Fly", targetReps: 12, weightKg: 0, restSeconds: 90, sortIndex: 1, requiresWeightInput: true),
+            ]
+        )
+    }
+
+    /// A day with no RPE-originated sets is never gated — the check is a
+    /// no-op regardless of what overrides (or lack thereof) exist.
+    func testHasUnfilledRequiredWeightsIsFalseWhenNoSetRequiresWeightInput() {
+        let base = makeBase()
+
+        XCTAssertFalse(SessionOverride.empty.hasUnfilledRequiredWeights(in: base))
+    }
+
+    /// An RPE set with no override entry at all is unfilled.
+    func testHasUnfilledRequiredWeightsIsTrueWhenRPESetHasNoOverride() {
+        let base = makeBaseWithRPESet()
+
+        XCTAssertTrue(SessionOverride.empty.hasUnfilledRequiredWeights(in: base))
+    }
+
+    /// An RPE set with an override entry present but no `weightKg` field set
+    /// (e.g. only `restSeconds` was touched) is still unfilled.
+    func testHasUnfilledRequiredWeightsIsTrueWhenOverrideEntryLacksWeight() {
+        let base = makeBaseWithRPESet()
+        let rpeID = base.sets[1].id
+        let override = SessionOverride(setOverrides: [rpeID: SetOverride(restSeconds: 120)])
+
+        XCTAssertTrue(override.hasUnfilledRequiredWeights(in: base))
+    }
+
+    /// Once the RPE set's override supplies a `weightKg`, the gate clears.
+    func testHasUnfilledRequiredWeightsIsFalseOnceRPESetWeightIsFilled() {
+        let base = makeBaseWithRPESet()
+        let rpeID = base.sets[1].id
+        let override = SessionOverride(setOverrides: [rpeID: SetOverride(weightKg: 22.5)])
+
+        XCTAssertFalse(override.hasUnfilledRequiredWeights(in: base))
+    }
+
+    /// A non-RPE set's weight override is irrelevant to the gate — only
+    /// `requiresWeightInput` sets are checked.
+    func testHasUnfilledRequiredWeightsIgnoresNonRPESetOverrides() {
+        let base = makeBaseWithRPESet()
+        let fixedID = base.sets[0].id
+        let override = SessionOverride(setOverrides: [fixedID: SetOverride(weightKg: 85)])
+
+        XCTAssertTrue(override.hasUnfilledRequiredWeights(in: base), "the RPE set is still unfilled even though a different set's weight was overridden")
+    }
+
+    /// A day with multiple RPE sets stays gated until every one of them has
+    /// a filled-in weight.
+    func testHasUnfilledRequiredWeightsRequiresEveryRPESetFilled() {
+        let base = PlannedSessionEnvelope(
+            programName: "Coach Block",
+            dayName: "Day 1",
+            sets: [
+                PlannedSetEnvelope(lift: .accessory, exerciseName: "Cable Fly", targetReps: 12, weightKg: 0, sortIndex: 0, requiresWeightInput: true),
+                PlannedSetEnvelope(lift: .accessory, exerciseName: "Leg Curl", targetReps: 12, weightKg: 0, sortIndex: 1, requiresWeightInput: true),
+            ]
+        )
+        let firstID = base.sets[0].id
+        let secondID = base.sets[1].id
+
+        let partiallyFilled = SessionOverride(setOverrides: [firstID: SetOverride(weightKg: 20)])
+        XCTAssertTrue(partiallyFilled.hasUnfilledRequiredWeights(in: base))
+
+        let fullyFilled = SessionOverride(setOverrides: [
+            firstID: SetOverride(weightKg: 20),
+            secondID: SetOverride(weightKg: 30),
+        ])
+        XCTAssertFalse(fullyFilled.hasUnfilledRequiredWeights(in: base))
+    }
+
     // MARK: Program/PlannedSet are never mutated
 
     /// Applying an override only ever rewrites the envelope copy; it must
