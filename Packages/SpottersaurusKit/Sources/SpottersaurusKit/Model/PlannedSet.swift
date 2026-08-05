@@ -21,13 +21,20 @@ public enum LoadPrescription: Codable, Sendable, Equatable, Hashable {
     /// A fraction of the lift's training max, expressed as a percent value
     /// (e.g. `85` means 85% of the training max).
     case percentOfTrainingMax(percent: Double)
+    /// A target RPE (rate of perceived exertion) for the set's reps — e.g.
+    /// coach shorthand `4x12@9(RPE)`. Reps stay on `PlannedSet.targetReps`;
+    /// this case only carries the RPE value, not a duplicate rep count.
+    case rpe(rpe: Double)
 
     /// Resolve to a concrete bar weight given the lift's training max (kg).
-    /// Absolute loads ignore the max; percentages scale it.
-    public func resolvedKg(trainingMaxKg: Double) -> Double {
+    /// Absolute loads ignore the max; percentages scale it. RPE loads have no
+    /// derivable weight — the lifter picks it in the moment to hit reps @
+    /// RPE — so this returns `nil` for `.rpe`.
+    public func resolvedKg(trainingMaxKg: Double) -> Double? {
         switch self {
         case .absolute(let kg): kg
         case .percentOfTrainingMax(let percent): trainingMaxKg * percent / 100.0
+        case .rpe: nil
         }
     }
 }
@@ -47,6 +54,10 @@ public final class PlannedSet {
     public var isAMRAP: Bool = false
     /// Rest after this set, in seconds.
     public var restSeconds: Int = 180
+    /// Manual "remember to film this set" reminder, parsed from coach
+    /// shorthand `(Filmar)`. Additive/defaulted so existing CloudKit-mirrored
+    /// records backfill to `false` rather than breaking the schema.
+    public var filmReminder: Bool = false
 
     /// The owning day (inverse of `ProgramDay.plannedSets`).
     public var day: ProgramDay?
@@ -60,6 +71,7 @@ public final class PlannedSet {
         load: LoadPrescription,
         isAMRAP: Bool = false,
         restSeconds: Int = 180,
+        filmReminder: Bool = false,
         sortIndex: Int = 0,
         id: UUID = UUID()
     ) {
@@ -69,11 +81,13 @@ public final class PlannedSet {
         self.load = load
         self.isAMRAP = isAMRAP
         self.restSeconds = restSeconds
+        self.filmReminder = filmReminder
         self.sortIndex = sortIndex
     }
 
-    /// Concrete bar weight for this set given a training max (kg).
-    public func resolvedWeightKg(trainingMaxKg: Double) -> Double {
+    /// Concrete bar weight for this set given a training max (kg). `nil` for
+    /// an RPE-prescribed set — see `LoadPrescription.resolvedKg`.
+    public func resolvedWeightKg(trainingMaxKg: Double) -> Double? {
         load.resolvedKg(trainingMaxKg: trainingMaxKg)
     }
 }
