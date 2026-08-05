@@ -34,6 +34,7 @@ struct PlannedSetBuilderView: View {
                 Picker("Load", selection: $set.load.kind) {
                     Text("Weight").tag(PlannedSetLoadDraft.Kind.absolute)
                     Text("% Training Max").tag(PlannedSetLoadDraft.Kind.percentOfTrainingMax)
+                    Text("RPE").tag(PlannedSetLoadDraft.Kind.rpe)
                 }
                 .pickerStyle(.segmented)
 
@@ -73,6 +74,16 @@ struct PlannedSetBuilderView: View {
                     Text("Percent")
                     Spacer()
                     Text("\(Int(set.load.value))%")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        case .rpe:
+            Stepper(value: $set.load.value, in: 0...10, step: 0.5) {
+                HStack {
+                    Text("Target RPE")
+                    Spacer()
+                    Text(set.load.value.formatted(.number.precision(.fractionLength(0...1))))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
