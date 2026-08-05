@@ -73,6 +73,12 @@ private struct ProgramListRow: View {
             Text("\(program.rule.displayName) · \(program.orderedDays.count) days")
                 .font(.system(.caption, design: .rounded, weight: .semibold))
                 .foregroundStyle(.secondary)
+
+            if let mesocycleNumber = program.mesocycleNumber, let weekNumber = program.weekNumber {
+                Text("Mesociclo \(mesocycleNumber) · Semana \(weekNumber)")
+                    .font(.system(.caption2, design: .rounded, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.brandOrange)
+            }
         }
     }
 }
@@ -80,4 +86,13 @@ private struct ProgramListRow: View {
 #Preview {
     ProgramsView()
         .modelContainer(PreviewSeed.seededContainer())
+}
+
+#Preview("Row with Mesocycle/Week") {
+    let program = Program(name: "Push/Pull/Legs", rule: .custom, mesocycleNumber: 2, weekNumber: 6)
+    program.appendDay(ProgramDay(name: "Day 1", sortIndex: 0))
+
+    return List {
+        ProgramListRow(program: program)
+    }
 }

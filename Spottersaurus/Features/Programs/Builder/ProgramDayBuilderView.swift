@@ -45,8 +45,17 @@ private struct PlannedSetDraftRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text(set.exerciseName)
-                    .font(.system(.body, design: .rounded, weight: .bold))
+                HStack(spacing: Theme.Spacing.xs) {
+                    Text(set.exerciseName)
+                        .font(.system(.body, design: .rounded, weight: .bold))
+
+                    if set.filmReminder {
+                        Image(systemName: "video.fill")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(Theme.Colors.brandOrange)
+                            .accessibilityLabel("Film reminder")
+                    }
+                }
                 Text(set.load.summary)
                     .font(.system(.caption, design: .rounded, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -65,7 +74,8 @@ private struct PlannedSetDraftRow: View {
     @Previewable @State var day = ProgramDayDraft(
         name: "Squat Day",
         sets: [
-            PlannedSetDraft(lift: .squat, targetReps: 5, load: PlannedSetLoadDraft(kind: .percentOfTrainingMax, value: 85)),
+            PlannedSetDraft(lift: .squat, targetReps: 5, load: PlannedSetLoadDraft(kind: .percentOfTrainingMax, value: 85), filmReminder: true),
+            PlannedSetDraft(lift: .accessory, customExerciseName: "Leg Press", targetReps: 12, load: PlannedSetLoadDraft(kind: .rpe, value: 9)),
             PlannedSetDraft(lift: .accessory, targetReps: 12, load: PlannedSetLoadDraft(kind: .absolute, value: 40)),
         ]
     )

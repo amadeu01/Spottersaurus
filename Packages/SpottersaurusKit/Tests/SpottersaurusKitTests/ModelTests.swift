@@ -243,4 +243,65 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(program.mesocycleNumber)
         XCTAssertNil(program.weekNumber)
     }
+
+    // MARK: PlannedSetLoadDraft.prescription / .summary
+
+    func testPlannedSetLoadDraftAbsolutePrescriptionAndSummary() {
+        let load = PlannedSetLoadDraft(kind: .absolute, value: 100)
+        XCTAssertEqual(load.prescription, .absolute(kg: 100))
+        XCTAssertEqual(load.summary, "100 kg")
+    }
+
+    func testPlannedSetLoadDraftPercentPrescriptionAndSummary() {
+        let load = PlannedSetLoadDraft(kind: .percentOfTrainingMax, value: 85)
+        XCTAssertEqual(load.prescription, .percentOfTrainingMax(percent: 85))
+        XCTAssertEqual(load.summary, "85% training max")
+    }
+
+    func testPlannedSetLoadDraftRPEPrescriptionAndSummary() {
+        let load = PlannedSetLoadDraft(kind: .rpe, value: 9)
+        XCTAssertEqual(load.prescription, .rpe(rpe: 9))
+        XCTAssertEqual(load.summary, "RPE 9")
+    }
+
+    // MARK: ProgramDraft.makeProgram() carries new fields through
+
+    func testMakeProgramCarriesFilmReminderThroughToPlannedSet() {
+        var draft = ProgramDraft(name: "Test", days: [
+            ProgramDayDraft(name: "Day 1", sets: [
+                PlannedSetDraft(lift: .bench, targetReps: 5, load: PlannedSetLoadDraft(kind: .absolute, value: 100), filmReminder: true),
+            ]),
+        ])
+        draft.days[0].sets.append(PlannedSetDraft(lift: .squat, targetReps: 5, load: PlannedSetLoadDraft(kind: .absolute, value: 100)))
+
+        let program = draft.makeProgram()
+        let sets = program.orderedDays[0].orderedSets
+        XCTAssertTrue(sets[0].filmReminder)
+        XCTAssertFalse(sets[1].filmReminder)
+    }
+
+    func testMakeProgramCarriesMesocycleAndWeekNumberThrough() {
+        let draft = ProgramDraft(name: "Imported", mesocycleNumber: 2, weekNumber: 6)
+        let program = draft.makeProgram()
+        XCTAssertEqual(program.mesocycleNumber, 2)
+        XCTAssertEqual(program.weekNumber, 6)
+    }
+
+    func testMakeProgramLeavesMesocycleAndWeekNumberNilWhenUnset() {
+        let draft = ProgramDraft(name: "Manual")
+        let program = draft.makeProgram()
+        XCTAssertNil(program.mesocycleNumber)
+        XCTAssertNil(program.weekNumber)
+    }
+
+    func testMakeProgramCarriesRPELoadThroughToPlannedSet() {
+        let draft = ProgramDraft(name: "Test", days: [
+            ProgramDayDraft(name: "Day 1", sets: [
+                PlannedSetDraft(lift: .accessory, customExerciseName: "Leg Press", targetReps: 12, load: PlannedSetLoadDraft(kind: .rpe, value: 9)),
+            ]),
+        ])
+        let program = draft.makeProgram()
+        let set = program.orderedDays[0].orderedSets[0]
+        XCTAssertEqual(set.load, .rpe(rpe: 9))
+    }
 }

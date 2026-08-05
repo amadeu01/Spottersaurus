@@ -66,6 +66,43 @@ private struct ProgramMetadataSection: View {
                 }
             }
         }
+
+        Section {
+            LabeledContent("Mesocycle") {
+                TextField("Optional", text: optionalIntBinding(for: $draft.mesocycleNumber))
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+            }
+
+            LabeledContent("Week") {
+                TextField("Optional", text: optionalIntBinding(for: $draft.weekNumber))
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+            }
+        } header: {
+            Text("Mesocycle / Week")
+        } footer: {
+            Text("Optional — labels a program pasted or copied from a coach-authored block. Leave blank if this program doesn't belong to a numbered week.")
+        }
+    }
+
+    /// Bridges an `Int?` binding to a `String` `TextField`, mapping a blank
+    /// string to `nil` and a non-numeric entry to the prior value.
+    private func optionalIntBinding(for value: Binding<Int?>) -> Binding<String> {
+        Binding<String>(
+            get: {
+                value.wrappedValue.map(String.init) ?? ""
+            },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                if trimmed.isEmpty {
+                    value.wrappedValue = nil
+                } else if let parsed = Int(trimmed) {
+                    value.wrappedValue = parsed
+                }
+                // Non-numeric input is ignored, leaving the prior value intact.
+            }
+        )
     }
 }
 

@@ -34,6 +34,7 @@ struct PlannedSetBuilderView: View {
                 Picker("Load", selection: $set.load.kind) {
                     Text("Weight").tag(PlannedSetLoadDraft.Kind.absolute)
                     Text("% Training Max").tag(PlannedSetLoadDraft.Kind.percentOfTrainingMax)
+                    Text("RPE").tag(PlannedSetLoadDraft.Kind.rpe)
                 }
                 .pickerStyle(.segmented)
 
@@ -47,6 +48,12 @@ struct PlannedSetBuilderView: View {
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
+                }
+            }
+
+            Section {
+                Toggle(isOn: $set.filmReminder) {
+                    Label("Film This Set", systemImage: "video.fill")
                 }
             }
         }
@@ -77,6 +84,16 @@ struct PlannedSetBuilderView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        case .rpe:
+            Stepper(value: $set.load.value, in: 1...10, step: 0.5) {
+                HStack {
+                    Text("Target RPE")
+                    Spacer()
+                    Text(set.load.value.formatted(.number.precision(.fractionLength(0...1))))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -87,12 +104,38 @@ struct PlannedSetBuilderView: View {
     }
 }
 
-#Preview {
+#Preview("Percent of Training Max") {
     @Previewable @State var set = PlannedSetDraft(
         lift: .bench,
         targetReps: 5,
         load: PlannedSetLoadDraft(kind: .percentOfTrainingMax, value: 85),
         isAMRAP: true
+    )
+
+    return NavigationStack {
+        PlannedSetBuilderView(set: $set)
+    }
+}
+
+#Preview("RPE Load") {
+    @Previewable @State var set = PlannedSetDraft(
+        lift: .accessory,
+        customExerciseName: "Leg Press",
+        targetReps: 12,
+        load: PlannedSetLoadDraft(kind: .rpe, value: 9)
+    )
+
+    return NavigationStack {
+        PlannedSetBuilderView(set: $set)
+    }
+}
+
+#Preview("Film Reminder") {
+    @Previewable @State var set = PlannedSetDraft(
+        lift: .squat,
+        targetReps: 5,
+        load: PlannedSetLoadDraft(kind: .absolute, value: 140),
+        filmReminder: true
     )
 
     return NavigationStack {
