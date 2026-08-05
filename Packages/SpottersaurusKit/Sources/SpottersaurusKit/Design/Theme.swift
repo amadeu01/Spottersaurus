@@ -18,10 +18,15 @@ public enum Theme {
 
     /// 8-pt based spacing scale used across both platforms.
     public enum Spacing {
+        /// 4
         public static let xs: Double = 4
+        /// 8
         public static let sm: Double = 8
+        /// 16
         public static let md: Double = 16
+        /// 24
         public static let lg: Double = 24
+        /// 32
         public static let xl: Double = 32
     }
 

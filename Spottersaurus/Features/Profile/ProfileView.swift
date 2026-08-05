@@ -74,7 +74,7 @@ struct ProfileView: View {
     }
 
     private var debugSection: some View {
-        #if DEBUG
+#if DEBUG
         Section {
             NavigationLink {
                 LogViewerView()
@@ -87,9 +87,9 @@ struct ProfileView: View {
                 Label("Raw Captures", systemImage: "waveform.path.ecg")
             }
         }
-        #else
+#else
         EmptyView()
-        #endif
+#endif
     }
 
     private var isSyncing: Bool {
