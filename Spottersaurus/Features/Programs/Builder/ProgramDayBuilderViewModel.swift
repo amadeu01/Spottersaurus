@@ -1,4 +1,6 @@
 import Foundation
+import SpottersaurusKit
+import SwiftUI
 
 struct ProgramDayBuilderViewModel {
     func addSet(to day: inout ProgramDayDraft) {

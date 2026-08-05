@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import SpottersaurusKit
+import SwiftUI
 
 @Observable
 final class ProgramBuilderViewModel {
