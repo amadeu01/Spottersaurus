@@ -1,4 +1,5 @@
 import Foundation
+import SpottersaurusKit
 import SwiftUI
 
 struct ProgramDayBuilderViewModel {
