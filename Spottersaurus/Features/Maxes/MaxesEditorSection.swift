@@ -22,6 +22,7 @@ struct MaxesEditorSection: View {
         Section("Training Maxes") {
             ForEach(viewModel.competitionMaxes) { maxRecord in
                 MaxesRow(maxes: maxRecord)
+
             }
         }
         .onAppear {
@@ -37,9 +38,9 @@ struct MaxesRow: View {
     @Bindable var maxes: UserMaxes
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Text(maxes.lift.displayName)
-                .font(.system(.headline, design: .rounded, weight: .bold))
+                .font(.system(.title2, design: .rounded, weight: .bold))
 
             Stepper(value: $maxes.trainingMaxKg, in: 0...500, step: 2.5) {
                 MetricLine(label: "Training Max", value: maxes.trainingMaxKg)
