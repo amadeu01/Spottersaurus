@@ -2,12 +2,6 @@
 //  ProfileView.swift
 //  Spottersaurus
 //
-//  Phase 0.1 P1: the new Profile screen — body info (latest imported body
-//  weight), the same "Training Maxes" editor `MaxesView` renders (via the
-//  shared `MaxesEditorSection`), a "Sync with Apple Health" control wired to
-//  H3's `HealthSyncService`, and the Debug Logs entry moved here. P2 swaps
-//  this in for the Maxes tab in `PlannerTabsView` — not done by this task.
-//
 
 import SwiftData
 import SwiftUI
@@ -80,6 +74,7 @@ struct ProfileView: View {
     }
 
     private var debugSection: some View {
+        #if DEBUG
         Section {
             NavigationLink {
                 LogViewerView()
@@ -92,6 +87,9 @@ struct ProfileView: View {
                 Label("Raw Captures", systemImage: "waveform.path.ecg")
             }
         }
+        #else
+        EmptyView()
+        #endif
     }
 
     private var isSyncing: Bool {

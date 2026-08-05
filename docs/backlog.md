@@ -268,10 +268,12 @@ Debug/tuning asset — local files, not CloudKit.
 
 ### P2-10 — Split `LiveSetViewModel` — **M**
 
-- [ ] **P2-10** `M` · Watch + Kit · **Extract sensor-buffer aggregator.**
+- [x] **P2-10** `M` · Watch + Kit · **Extract sensor-buffer aggregator.** (2026-08-05) — `6880704`
   Goal: move motion/HR buffers + telemetry timestamps into a pure Kit
   aggregator; ViewModel keeps orchestration. Done-when: aggregator unit-tested;
   ViewModel shrinks. (Addresses the audit God-ViewModel finding.)
+  <!-- Landed as `LiveSetSensorAggregator` (Session/). Checkbox was stale until
+       the 2026-08-05 audit re-flagged the remaining scope — see Phase 5. -->
 
 ---
 
@@ -319,6 +321,66 @@ Debug/tuning asset — local files, not CloudKit.
 - [ ] **P4-16a** `S` · **iPhone surface token audit** (light/dark, 44pt, insets).
 - [ ] **P4-16b** `S` · **Watch surface token audit** (bezel, AOD variant).
 - [ ] **P4-16c** `S` · **Motion & haptics pass** (press-scale, state-change).
+
+---
+
+## Phase 5 — Architecture Audit Remediation (2026-08-05)
+
+Findings from the `brooks-lint:brooks-audit` run in `docs/audits/2026-08-05-architecture-audit.md`.
+Two Warnings, three Suggestions — no Criticals. AUD-2 is sequenced after AUD-1
+so the orchestration move lands on an already-slimmed `LiveSetViewModel`
+rather than piling onto a growing one; everything else is independent and can
+run in any order.
+
+### AUD-1 — Extract capture-marker instrumentation from `LiveSetViewModel` — **S**
+
+- [ ] **AUD-1** `S` · Watch + Kit · **`LiveSetCaptureMarkerEmitter`.**
+  Goal: pull `onCaptureMarker`/`emitCaptureMarker`/the marker half of
+  `stepLifecycle` out of `LiveSetViewModel` into a small owned type the VM
+  delegates to — mirrors what `P2-10` already did for the sensor buffer.
+  Done-when: emitter unit-tested in isolation; `LiveSetViewModel` no longer
+  contains marker-emission logic; `swift test` + both app builds green.
+
+### AUD-2 — Move `LiveSetView` orchestration onto `LiveSetViewModel` — **M**
+
+- [ ] **AUD-2** `M` · Watch · **De-god the View.** — depends on AUD-1
+  Goal: move `startWarmup`, `startWorkout`, `sendFinishedSessionIfAvailable`,
+  `handleLatestCommand`, `playAlertFeedbackIfNeeded` off `LiveSetView` onto
+  `LiveSetViewModel` (or a `LiveSetOrchestrator` it owns), injecting
+  `sessionCoordinator`/`dependencies`/`feedback` as collaborators instead of
+  the View holding them as `@State`. Done-when: `LiveSetView` holds only
+  `viewModel` + layout; orchestration methods are unit-tested without
+  SwiftUI; both app builds green.
+
+### AUD-3 — Gate Debug tooling behind `#if DEBUG`; de-duplicate entry point — **S**
+
+- [ ] **AUD-3** `S` · iOS · **Debug Logs / Raw Captures not shipped to Release.**
+  Goal: wrap `ProfileView`'s `debugSection` (Debug Logs + Raw Captures) in
+  `#if DEBUG`; delete the duplicate "Debug Logs" toolbar entry in
+  `MaxesView` now that `ProfileView` is canonical. Done-when: Release build
+  configuration shows neither entry; Debug build shows both from `Profile`
+  only; both app builds green.
+
+### AUD-4 — Seam `WatchLink.reactivate()`/`configure()` through `PlannerDependencies` — **S**
+
+- [ ] **AUD-4** `S` · iOS · **Consistent WatchLink injection.**
+  Goal: either add `reactivate` (and, if warranted, `configure`) to
+  `PlannerDependencies` so `TodayView`/`PlannerTabsView` stop calling
+  `WatchLink.shared` directly, or leave the direct calls and add a doc
+  comment at each site explaining the exemption (composition-root wiring vs.
+  per-send mutation) — matching the comment style `WatchDependencies.swift`
+  already uses for its analogous singleton reads. Done-when: either the
+  closure is wired + call sites updated, or both call sites carry the
+  explanatory comment; iOS build green.
+
+### AUD-5 — Fold `ProgramDayBuilderViewModel` into `ProgramDayDraft` (or rename) — **S**
+
+- [ ] **AUD-5** `S` · iOS · **Stop calling a stateless helper a ViewModel.**
+  Goal: fold `addSet`/`deleteSets`/`moveSets` into `ProgramDayDraft` as
+  mutating methods, or rename `ProgramDayBuilderViewModel` to something that
+  doesn't imply the `@Observable` ViewModel pattern every other VM in the
+  codebase follows. Done-when: `Builder/` has no type presenting as a
+  ViewModel that isn't one; call sites updated; iOS build green.
 
 ---
 

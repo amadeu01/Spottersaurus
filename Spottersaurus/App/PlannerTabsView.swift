@@ -16,11 +16,14 @@ struct PlannerTabsView: View {
             ProgramsView()
                 .tabItem { Label("Programs", systemImage: "list.bullet.rectangle") }
 
-            ReviewView()
-                .tabItem { Label("Review", systemImage: "chart.xyaxis.line") }
+            HistoryView()
+                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
 
-            MaxesView()
-                .tabItem { Label("Maxes", systemImage: "gauge.with.dots.needle.67percent") }
+            AnalyticsView()
+                .tabItem { Label("Analytics", systemImage: "chart.xyaxis.line") }
+
+            ProfileView()
+                .tabItem { Label("Profile", systemImage: "person.crop.circle") }
         }
         .tint(Theme.Colors.brandOrange)
         .environment(\.plannerDependencies, .live)

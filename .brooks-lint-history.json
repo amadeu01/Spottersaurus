@@ -9,5 +9,27 @@
       "suggestion": 1
     },
     "scope": "entire project (~120 swift files)"
+  },
+  {
+    "date": "2026-07-28",
+    "mode": "Architecture Audit",
+    "score": 84,
+    "findings": {
+      "critical": 0,
+      "warning": 3,
+      "suggestion": 1
+    },
+    "scope": "entire project (182 Swift files; module graph complete, large files sampled)"
+  },
+  {
+    "date": "2026-08-05",
+    "mode": "Architecture Audit",
+    "score": 87,
+    "findings": {
+      "critical": 0,
+      "warning": 2,
+      "suggestion": 3
+    },
+    "scope": "entire project (~130 Swift files: Spottersaurus iOS, Spottersaurus Watch App, SpottersaurusKit)"
   }
 ]
